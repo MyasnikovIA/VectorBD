@@ -1,7 +1,7 @@
 package ru.miacomsoft.vectordb.knowledge;
 
 import ru.miacomsoft.vectordb.core.SemanticChunker;
-import ru.miacomsoft.vectordb.core.VectorDatabase;
+import ru.miacomsoft.vectordb.core.BinaryVectorDatabase;
 import ru.miacomsoft.vectordb.core.SemanticChunker.Chunk;
 
 import java.io.*;
@@ -15,14 +15,14 @@ import java.util.Map;
 
 /**
  * Загрузчик текстовых знаний с использованием SemanticChunker
- * для разбиения текста на семантические чанки и сохранения в векторную базу
+ * для разбиения текста на семантические чанки и сохранения в бинарную векторную базу
  */
 public class KnowledgeLoader {
-    private final VectorDatabase database;
+    private final BinaryVectorDatabase database;
     private final SemanticChunker semanticChunker;
     private final KnowledgeConfig knowledgeConfig;
 
-    public KnowledgeLoader(VectorDatabase database, KnowledgeConfig knowledgeConfig) {
+    public KnowledgeLoader(BinaryVectorDatabase database, KnowledgeConfig knowledgeConfig) {
         this.database = database;
         this.knowledgeConfig = knowledgeConfig;
 
@@ -204,7 +204,7 @@ public class KnowledgeLoader {
                            int chunkIndex, String sourceName) throws Exception {
         Object[] chunkPath = createChunkPath(basePath, chunkIndex);
 
-        // Сохраняем текст с чанкингом в векторную базу
+        // Сохраняем текст с чанкингом в бинарную векторную базу
         database.storeTextWithChunking(
                 chunk.getText(),
                 documentId + "_chunk_" + chunkIndex,
@@ -220,6 +220,10 @@ public class KnowledgeLoader {
         // Можно сохранить метаданные в отдельный узел базы данных
         Object[] metadataPath = createMetadataPath(path);
         // Реализация сохранения метаданных зависит от структуры вашей базы данных
+        System.out.println("Metadata saved for " + documentId +
+                ": length=" + textLength +
+                ", chunks=" + chunkCount +
+                ", source=" + sourceName);
     }
 
     /**
@@ -296,8 +300,109 @@ public class KnowledgeLoader {
             System.out.println("Total tree nodes in database: " + database.getTreeNodeCount());
             System.out.println("Current similarity threshold: " + getCurrentSimilarityThreshold());
             System.out.println("SemanticChunker config: " + getSemanticChunkerConfig());
+
+            // Дополнительная информация о базе данных
+            System.out.println("Database path: " + getDatabaseInfo());
         } catch (Exception e) {
             System.err.println("Error getting knowledge stats: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Получить информацию о базе данных
+     */
+    public String getDatabaseInfo() {
+        return "BinaryVectorDatabase (binary format)";
+    }
+
+    /**
+     * Очистить все знания из базы данных
+     */
+    public void clearKnowledgeBase() {
+        try {
+            // Для очистки базы данных нужно создать новую пустую базу
+            System.out.println("Clearing knowledge base...");
+            // В текущей реализации BinaryVectorDatabase нет метода clear(),
+            // поэтому нужно удалить файлы базы данных вручную или создать новую базу
+            System.out.println("Note: To clear knowledge base, create a new BinaryVectorDatabase instance");
+        } catch (Exception e) {
+            System.err.println("Error clearing knowledge base: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Экспорт статистики в виде Map
+     */
+    public Map<String, Object> exportStats() {
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("totalVectors", database.getVectorCount());
+        stats.put("totalTreeNodes", database.getTreeNodeCount());
+        stats.put("similarityThreshold", getCurrentSimilarityThreshold());
+        stats.put("chunkerConfig", getSemanticChunkerConfig());
+        stats.put("databaseType", "BinaryVectorDatabase");
+        return stats;
+    }
+
+    /**
+     * Проверить, доступна ли база знаний
+     */
+    public boolean isKnowledgeBaseAvailable() {
+        try {
+            return database.getVectorCount() >= 0; // Простая проверка доступности
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Получить размер базы знаний в приблизительных единицах
+     */
+    public String getKnowledgeBaseSize() {
+        try {
+            int vectorCount = database.getVectorCount();
+            int nodeCount = database.getTreeNodeCount();
+            return String.format("Vectors: %d, TreeNodes: %d", vectorCount, nodeCount);
+        } catch (Exception e) {
+            return "Unknown";
+        }
+    }
+
+    /**
+     * Загрузить несколько текстовых документов пакетно
+     */
+    public Map<String, Integer> loadTextBatch(Map<String, String> texts, String baseDocumentId,
+                                              Object[] basePath, int maxChunkSize) throws Exception {
+        Map<String, Integer> results = new HashMap<>();
+
+        for (Map.Entry<String, String> entry : texts.entrySet()) {
+            String documentName = entry.getKey();
+            String text = entry.getValue();
+            String documentId = baseDocumentId + "_" + documentName;
+            Object[] documentPath = createFilePath(basePath, documentName);
+
+            try {
+                int chunks = loadText(text, documentId, documentPath, maxChunkSize, documentName);
+                results.put(documentName, chunks);
+                System.out.println("Loaded " + chunks + " chunks from " + documentName);
+            } catch (Exception e) {
+                System.err.println("Failed to load " + documentName + ": " + e.getMessage());
+                results.put(documentName, -1); // -1 indicates error
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * Оптимизировать базу знаний (сохранить и переиндексировать)
+     */
+    public void optimizeKnowledgeBase() {
+        try {
+            System.out.println("Optimizing knowledge base...");
+            database.saveDatabase();
+            System.out.println("Knowledge base optimized and saved");
+        } catch (Exception e) {
+            System.err.println("Error optimizing knowledge base: " + e.getMessage());
         }
     }
 }

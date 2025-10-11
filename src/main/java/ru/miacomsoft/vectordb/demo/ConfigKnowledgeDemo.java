@@ -1,7 +1,8 @@
 package ru.miacomsoft.vectordb.demo;
 
+import ru.miacomsoft.vectordb.core.BinaryVectorDatabase;
 import ru.miacomsoft.vectordb.core.SemanticChunker;
-import ru.miacomsoft.vectordb.core.VectorDatabase;
+
 import ru.miacomsoft.vectordb.knowledge.KnowledgeConfig;
 import ru.miacomsoft.vectordb.knowledge.KnowledgeLoader;
 import ru.miacomsoft.vectordb.knowledge.OllamaKnowledgeClient;
@@ -32,7 +33,7 @@ public class ConfigKnowledgeDemo {
         // Способ 1: Стандартный конструктор
         KnowledgeConfig config1 = new KnowledgeConfig(
                 "http://localhost:11434",
-                "llama3.2",
+                "deepseek-v3.1:671b-cloud",
                 0.8,
                 true,
                 true
@@ -60,7 +61,7 @@ public class ConfigKnowledgeDemo {
         // Создание кастомного KnowledgeConfig
         KnowledgeConfig knowledgeConfig = new KnowledgeConfig(
                 "http://localhost:11434",
-                "llama3.2",
+                "deepseek-v3.1:671b-cloud",
                 0.8,
                 true,
                 true
@@ -72,7 +73,7 @@ public class ConfigKnowledgeDemo {
                 "all-minilm:22m",
                 knowledgeConfig.getSimilarityThreshold()
         );
-        VectorDatabase vectorDB = new VectorDatabase("./data/knowledge_db", semanticChunker);
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase("./data/knowledge_db", semanticChunker);
 
         // Создание KnowledgeLoader с конфигурацией
         KnowledgeLoader knowledgeLoader = new KnowledgeLoader(vectorDB, knowledgeConfig);
@@ -91,11 +92,11 @@ public class ConfigKnowledgeDemo {
                 "all-minilm:22m",
                 0.8
         );
-        VectorDatabase vectorDB = new VectorDatabase("./data/knowledge_db", semanticChunker);
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase("./data/knowledge_db", semanticChunker);
 
         KnowledgeConfig knowledgeConfig = new KnowledgeConfig(
                 "http://localhost:11434",
-                "llama3.2",
+                "deepseek-v3.1:671b-cloud",
                 0.8,
                 true,
                 true
@@ -121,7 +122,7 @@ public class ConfigKnowledgeDemo {
         // Сценарий 1: Динамическое изменение конфигурации
         KnowledgeConfig dynamicConfig = new KnowledgeConfig(
                 "http://localhost:11434",
-                "llama3.2",
+                "deepseek-v3.1:671b-cloud",
                 0.8,
                 true,
                 true
@@ -132,12 +133,12 @@ public class ConfigKnowledgeDemo {
                 "all-minilm:22m",
                 dynamicConfig.getSimilarityThreshold()
         );
-        VectorDatabase vectorDB = new VectorDatabase("./data/knowledge_db", semanticChunker);
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase("./data/knowledge_db", semanticChunker);
 
         // Сценарий 2: Валидация конфигурации
         KnowledgeConfig knowledgeConfig = new KnowledgeConfig(
                 "http://localhost:11434",
-                "llama3.2",
+                "deepseek-v3.1:671b-cloud",
                 0.8,
                 true,
                 true
@@ -149,7 +150,7 @@ public class ConfigKnowledgeDemo {
         // Сценарий 3: Использование разных конфигураций для разных баз данных
         KnowledgeConfig config1 = new KnowledgeConfig(
                 "http://localhost:11434",
-                "llama3.2",
+                "deepseek-v3.1:671b-cloud",
                 0.8,
                 true,
                 true

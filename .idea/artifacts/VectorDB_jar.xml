@@ -1,0 +1,9 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="VectorDB:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/VectorDB_jar</output-path>
+    <root id="archive" name="VectorDB.jar">
+      <element id="module-output" name="VectorDB" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/json/json/20231013/json-20231013.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>

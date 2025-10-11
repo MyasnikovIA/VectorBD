@@ -1,19 +1,19 @@
 package ru.miacomsoft.vectordb.core;
 
 public class VectorSearchResult {
-    private VectorData vectorData;
+    private BinaryVectorData vectorData;
     private double similarity;
     private double distance;
 
-    public VectorSearchResult(VectorData vectorData, double similarity, double distance) {
+    public VectorSearchResult(BinaryVectorData vectorData, double similarity, double distance) {
         this.vectorData = vectorData;
         this.similarity = similarity;
         this.distance = distance;
     }
 
     // Getters and setters
-    public VectorData getVectorData() { return vectorData; }
-    public void setVectorData(VectorData vectorData) { this.vectorData = vectorData; }
+    public BinaryVectorData getVectorData() { return vectorData; }
+    public void setVectorData(BinaryVectorData vectorData) { this.vectorData = vectorData; }
 
     public double getSimilarity() { return similarity; }
     public void setSimilarity(double similarity) { this.similarity = similarity; }

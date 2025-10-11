@@ -1,7 +1,8 @@
 package ru.miacomsoft.vectordb.demo;
 
+import ru.miacomsoft.vectordb.core.BinaryVectorDatabase;
 import ru.miacomsoft.vectordb.core.SemanticChunker;
-import ru.miacomsoft.vectordb.core.VectorDatabase;
+
 import ru.miacomsoft.vectordb.knowledge.KnowledgeConfig;
 import ru.miacomsoft.vectordb.knowledge.OllamaKnowledgeClient;
 
@@ -15,7 +16,7 @@ public class OllamaChatDemo {
         // Создание конфигурации знаний
         KnowledgeConfig knowledgeConfig = new KnowledgeConfig(
                 "http://localhost:11434",
-                "llama3.2",
+                "deepseek-v3.1:671b-cloud",
                 0.7,
                 true,
                 true
@@ -27,7 +28,7 @@ public class OllamaChatDemo {
                 "all-minilm:22m",
                 knowledgeConfig.getSimilarityThreshold()
         );
-        VectorDatabase vectorDB = new VectorDatabase("./data/chat_demo", semanticChunker);
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase("./data/chat_demo", semanticChunker);
 
         OllamaKnowledgeClient chatClient = new OllamaKnowledgeClient(vectorDB, knowledgeConfig);
 
@@ -52,7 +53,7 @@ public class OllamaChatDemo {
             String selectedModel = selectAvailableModel(availableModels);
             if (selectedModel == null) {
                 System.out.println("❌ No suitable models found. Please install at least one model in Ollama.");
-                System.out.println("You can install a model using: ollama pull llama3.2");
+                System.out.println("You can install a model using: ollama pull deepseek-v3.1:671b-cloud");
                 return;
             }
 

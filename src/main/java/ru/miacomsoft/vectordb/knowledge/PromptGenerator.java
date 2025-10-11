@@ -1,23 +1,28 @@
 package ru.miacomsoft.vectordb.knowledge;
 
 import ru.miacomsoft.vectordb.core.SemanticChunker;
-import ru.miacomsoft.vectordb.core.VectorDatabase;
+import ru.miacomsoft.vectordb.core.BinaryVectorDatabase;
 import ru.miacomsoft.vectordb.core.VectorSearchResult;
+import ru.miacomsoft.vectordb.core.BinaryVectorData;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Генератор промптов для AI с использованием семантического поиска
- * Адаптирован для работы с VectorDatabase
+ * Адаптирован для работы с BinaryVectorDatabase
  */
 public class PromptGenerator {
-    private final VectorDatabase vectorDB;
+    private final BinaryVectorDatabase vectorDB;
     private final SemanticChunker semanticChunker;
+    private final KnowledgeConfig knowledgeConfig;
 
-    public PromptGenerator(VectorDatabase vectorDB, KnowledgeConfig knowledgeConfig) {
+    public PromptGenerator(BinaryVectorDatabase vectorDB, KnowledgeConfig knowledgeConfig) {
         this.vectorDB = vectorDB;
+        this.knowledgeConfig = knowledgeConfig;
         this.semanticChunker = new SemanticChunker(
                 knowledgeConfig.getOllamaUrl(),
                 "all-minilm:22m",
@@ -25,13 +30,20 @@ public class PromptGenerator {
         );
     }
 
-    public PromptGenerator(VectorDatabase vectorDB) {
+    public PromptGenerator(BinaryVectorDatabase vectorDB) {
         this.vectorDB = vectorDB;
         // Используем дефолтные настройки для SemanticChunker
         this.semanticChunker = new SemanticChunker(
                 "http://localhost:11434",
                 "all-minilm:22m",
                 0.7
+        );
+        this.knowledgeConfig = new KnowledgeConfig(
+                "http://localhost:11434",
+                "deepseek-v3.1:671b-cloud",
+                0.7,
+                true,
+                true
         );
     }
 
@@ -44,6 +56,7 @@ public class PromptGenerator {
      */
     public String createContextPrompt(String aiQuery, int maxResultsPerChunk, double similarityThreshold) throws Exception {
         System.out.println("Creating context prompt for query: " + aiQuery);
+        System.out.println("Using BinaryVectorDatabase for semantic search");
 
         // Разбиваем запрос на семантические чанки
         List<SemanticChunker.Chunk> queryChunks = splitQueryIntoChunks(aiQuery);
@@ -75,7 +88,7 @@ public class PromptGenerator {
 
         // Убираем дубликаты (по тексту)
         List<VectorSearchResult> uniqueResults = removeDuplicateResults(allSimilarResults);
-        System.out.println("Found " + uniqueResults.size() + " unique relevant documents");
+        System.out.println("Found " + uniqueResults.size() + " unique relevant documents from BinaryVectorDatabase");
 
         // Формируем финальный промпт
         return buildFinalPrompt(aiQuery, uniqueResults);
@@ -101,7 +114,7 @@ public class PromptGenerator {
      */
     private List<VectorSearchResult> removeDuplicateResults(List<VectorSearchResult> results) {
         List<VectorSearchResult> uniqueResults = new ArrayList<>();
-        List<String> seenTexts = new ArrayList<>();
+        Set<String> seenTexts = new HashSet<>();
 
         for (VectorSearchResult result : results) {
             String text = extractTextFromResult(result);
@@ -134,7 +147,7 @@ public class PromptGenerator {
         prompt.append("=== КОНТЕКСТ ===\n");
 
         if (contextResults.isEmpty()) {
-            prompt.append("Релевантный контекст не найден. Ответь на вопрос используя свои знания.\n");
+            prompt.append("Релевантный контекст не найден в базе знаний. Ответь на вопрос используя свои знания.\n");
         } else {
             // Сортируем результаты по схожести (от высшей к низшей)
             contextResults.sort((r1, r2) -> Double.compare(r2.getSimilarity(), r1.getSimilarity()));
@@ -159,6 +172,7 @@ public class PromptGenerator {
      */
     public String createQuestionGenerationPrompt(String topic, int numQuestions, double similarityThreshold) throws Exception {
         System.out.println("Creating question generation prompt for topic: " + topic);
+        System.out.println("Searching in BinaryVectorDatabase...");
 
         // Находим релевантные документы по теме
         List<VectorSearchResult> relevantDocs = vectorDB.similaritySearch(topic, 5);
@@ -188,7 +202,7 @@ public class PromptGenerator {
 
         prompt.append("=== КОНТЕКСТ ===\n");
         if (contextDocs.isEmpty()) {
-            prompt.append("Контекст не предоставлен. Сгенерируй общие вопросы по теме.\n");
+            prompt.append("Контекст не найден в базе знаний. Сгенерируй общие вопросы по теме.\n");
         } else {
             for (int i = 0; i < contextDocs.size(); i++) {
                 VectorSearchResult doc = contextDocs.get(i);
@@ -213,6 +227,7 @@ public class PromptGenerator {
      */
     public String createSummarizationPrompt(String focusTopic, int maxContextItems, double similarityThreshold) throws Exception {
         System.out.println("Creating summarization prompt for topic: " + focusTopic);
+        System.out.println("Searching in BinaryVectorDatabase...");
 
         // Находим релевантные документы
         List<VectorSearchResult> relevantDocs = vectorDB.similaritySearch(focusTopic, maxContextItems);
@@ -241,7 +256,7 @@ public class PromptGenerator {
 
         prompt.append("=== ИСХОДНАЯ ИНФОРМАЦИЯ ===\n");
         if (contextDocs.isEmpty()) {
-            prompt.append("Информация для суммаризации не предоставлена.\n");
+            prompt.append("Информация для суммаризации не найдена в базе знаний.\n");
         } else {
             for (int i = 0; i < contextDocs.size(); i++) {
                 VectorSearchResult doc = contextDocs.get(i);
@@ -262,11 +277,144 @@ public class PromptGenerator {
     }
 
     /**
+     * Создать промпт для сравнения нескольких концепций
+     */
+    public String createComparisonPrompt(String concept1, String concept2, double similarityThreshold) throws Exception {
+        System.out.println("Creating comparison prompt for: " + concept1 + " vs " + concept2);
+
+        // Находим документы по обеим концепциям
+        List<VectorSearchResult> docs1 = vectorDB.similaritySearch(concept1, 3);
+        List<VectorSearchResult> docs2 = vectorDB.similaritySearch(concept2, 3);
+
+        // Фильтруем и объединяем результаты
+        List<VectorSearchResult> allDocs = new ArrayList<>();
+        for (VectorSearchResult result : docs1) {
+            if (result.getSimilarity() >= similarityThreshold) {
+                allDocs.add(result);
+            }
+        }
+        for (VectorSearchResult result : docs2) {
+            if (result.getSimilarity() >= similarityThreshold) {
+                allDocs.add(result);
+            }
+        }
+
+        List<VectorSearchResult> uniqueDocs = removeDuplicateResults(allDocs);
+        System.out.println("Found " + uniqueDocs.size() + " documents for comparison");
+
+        return buildComparisonPrompt(concept1, concept2, uniqueDocs);
+    }
+
+    /**
+     * Построить промпт для сравнения
+     */
+    private String buildComparisonPrompt(String concept1, String concept2, List<VectorSearchResult> contextDocs) {
+        StringBuilder prompt = new StringBuilder();
+
+        prompt.append("Сравни следующие две концепции: '").append(concept1).append("' и '").append(concept2).append("'\n\n");
+
+        prompt.append("=== КОНТЕКСТ ДЛЯ СРАВНЕНИЯ ===\n");
+        if (contextDocs.isEmpty()) {
+            prompt.append("Информация для сравнения не найдена в базе знаний.\n");
+        } else {
+            for (int i = 0; i < contextDocs.size(); i++) {
+                VectorSearchResult doc = contextDocs.get(i);
+                prompt.append("\n[Документ ").append(i + 1).append("]\n");
+                prompt.append(extractTextFromResult(doc)).append("\n");
+            }
+        }
+
+        prompt.append("\n=== ТРЕБОВАНИЯ К СРАВНЕНИЮ ===\n");
+        prompt.append("- Выдели сходства и различия\n");
+        prompt.append("- Укажи преимущества и недостатки каждой концепции\n");
+        prompt.append("- Приведи примеры использования\n");
+        prompt.append("- Структурируй ответ в виде таблицы или списка\n\n");
+
+        prompt.append("=== СРАВНЕНИЕ ===\n");
+
+        return prompt.toString();
+    }
+
+    /**
+     * Создать промпт для объяснения сложной темы простыми словами
+     */
+    public String createExplanationPrompt(String complexTopic, double similarityThreshold) throws Exception {
+        System.out.println("Creating explanation prompt for complex topic: " + complexTopic);
+
+        List<VectorSearchResult> relevantDocs = vectorDB.similaritySearch(complexTopic, 4);
+
+        List<VectorSearchResult> filteredDocs = new ArrayList<>();
+        for (VectorSearchResult result : relevantDocs) {
+            if (result.getSimilarity() >= similarityThreshold) {
+                filteredDocs.add(result);
+            }
+        }
+
+        List<VectorSearchResult> uniqueDocs = removeDuplicateResults(filteredDocs);
+        System.out.println("Found " + uniqueDocs.size() + " documents for explanation");
+
+        return buildExplanationPrompt(complexTopic, uniqueDocs);
+    }
+
+    /**
+     * Построить промпт для объяснения
+     */
+    private String buildExplanationPrompt(String topic, List<VectorSearchResult> contextDocs) {
+        StringBuilder prompt = new StringBuilder();
+
+        prompt.append("Объясни следующую тему простыми словами: ").append(topic).append("\n\n");
+
+        prompt.append("=== ИСХОДНАЯ ИНФОРМАЦИЯ ===\n");
+        if (contextDocs.isEmpty()) {
+            prompt.append("Информация по теме не найдена в базе знаний.\n");
+        } else {
+            for (int i = 0; i < contextDocs.size(); i++) {
+                VectorSearchResult doc = contextDocs.get(i);
+                prompt.append("\n[Документ ").append(i + 1).append("]\n");
+                prompt.append(extractTextFromResult(doc)).append("\n");
+            }
+        }
+
+        prompt.append("\n=== ТРЕБОВАНИЯ К ОБЪЯСНЕНИЮ ===\n");
+        prompt.append("- Используй простой и понятный язык\n");
+        prompt.append("- Приведи аналогии и примеры из реальной жизни\n");
+        prompt.append("- Избегай сложной терминологии\n");
+        prompt.append("- Структурируй объяснение логически\n\n");
+
+        prompt.append("=== ОБЪЯСНЕНИЕ ===\n");
+
+        return prompt.toString();
+    }
+
+    /**
      * Получить базовую статистику по используемым знаниям
      */
     public void printKnowledgeStats() {
-        System.out.println("=== KNOWLEDGE BASE STATISTICS ===");
+        System.out.println("=== BINARY VECTOR DATABASE STATISTICS ===");
         System.out.println("Total vectors: " + vectorDB.getVectorCount());
         System.out.println("Total tree nodes: " + vectorDB.getTreeNodeCount());
+        System.out.println("Database type: BinaryVectorDatabase (optimized binary format)");
+    }
+
+    /**
+     * Проверить доступность базы знаний
+     */
+    public boolean isKnowledgeBaseAvailable() {
+        try {
+            return vectorDB.getVectorCount() >= 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Получить информацию о конфигурации поиска
+     */
+    public String getSearchConfigInfo() {
+        return String.format(
+                "Search Configuration: BinaryVectorDatabase, SimilarityThreshold=%.2f, Model=%s",
+                knowledgeConfig.getSimilarityThreshold(),
+                knowledgeConfig.getModel()
+        );
     }
 }

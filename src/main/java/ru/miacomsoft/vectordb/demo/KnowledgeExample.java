@@ -1,7 +1,8 @@
 package ru.miacomsoft.vectordb.demo;
 
+import ru.miacomsoft.vectordb.core.BinaryVectorDatabase;
 import ru.miacomsoft.vectordb.core.SemanticChunker;
-import ru.miacomsoft.vectordb.core.VectorDatabase;
+
 import ru.miacomsoft.vectordb.knowledge.KnowledgeConfig;
 import ru.miacomsoft.vectordb.knowledge.KnowledgeLoader;
 import ru.miacomsoft.vectordb.knowledge.OllamaKnowledgeClient;
@@ -12,7 +13,7 @@ public class KnowledgeExample {
             // Конфигурация Knowledge системы
             KnowledgeConfig knowledgeConfig = new KnowledgeConfig(
                     "http://localhost:11434",
-                    "llama3.2",
+                    "deepseek-v3.1:671b-cloud",
                     0.8,
                     true,
                     true
@@ -26,7 +27,7 @@ public class KnowledgeExample {
             );
 
             // Создание векторной базы данных
-            VectorDatabase vectorDB = new VectorDatabase("./data/knowledge_db", semanticChunker);
+            BinaryVectorDatabase vectorDB = new BinaryVectorDatabase("./data/knowledge_db", semanticChunker);
 
             // Создание KnowledgeLoader
             KnowledgeLoader knowledgeLoader = new KnowledgeLoader(vectorDB, knowledgeConfig);
