@@ -95,21 +95,6 @@ public class BinaryVectorDatabase {
         return results;
     }
 
-    public List<BinaryVectorData> exactSearch(String searchText) {
-        List<BinaryVectorData> results = new ArrayList<>();
-        String searchLower = searchText.toLowerCase();
-
-        for (BinaryVectorData vectorData : vectors.values()) {
-            if (vectorData.getText() != null &&
-                    vectorData.getText().toLowerCase().contains(searchLower)) {
-                results.add(vectorData);
-            }
-        }
-
-        results.sort((a, b) -> Long.compare(b.getTimestamp(), a.getTimestamp()));
-        return results;
-    }
-
     public List<BinaryVectorData> searchByPath(String pathPattern) {
         List<BinaryVectorData> results = new ArrayList<>();
         String patternLower = pathPattern.toLowerCase();
@@ -302,5 +287,62 @@ public class BinaryVectorDatabase {
 
     public void close() {
         saveDatabase();
+    }
+
+
+
+    /**
+     * Найти все векторные данные
+     */
+    public List<BinaryVectorData> findAllVectorData() {
+        return new ArrayList<>(vectors.values());
+    }
+
+    /**
+     * Найти векторные данные по ID
+     */
+    public BinaryVectorData findVectorData(String id) {
+        return vectors.get(id);
+    }
+
+    /**
+     * Получить все ключи
+     */
+    public Set<String> getAllKeys() {
+        return vectors.keySet();
+    }
+
+    /**
+     * Создать индекс
+     */
+    public void createIndex(String indexName, String columnName) {
+        // Реализация создания индекса
+        System.out.println("Creating index: " + indexName + " on column: " + columnName);
+    }
+
+    /**
+     * Удалить индекс
+     */
+    public void dropIndex(String indexName) {
+        // Реализация удаления индекса
+        System.out.println("Dropping index: " + indexName);
+    }
+
+    /**
+     * Точный поиск по тексту
+     */
+    public List<BinaryVectorData> exactSearch(String searchText) {
+        List<BinaryVectorData> results = new ArrayList<>();
+        String searchLower = searchText.toLowerCase();
+
+        for (BinaryVectorData vectorData : vectors.values()) {
+            if (vectorData.getText() != null &&
+                    vectorData.getText().toLowerCase().contains(searchLower)) {
+                results.add(vectorData);
+            }
+        }
+
+        results.sort((a, b) -> Long.compare(b.getTimestamp(), a.getTimestamp()));
+        return results;
     }
 }
