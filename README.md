@@ -8,6 +8,9 @@ Java-библиотека для работы с векторными базам
 # Документация с примерами использования
 - [DOCUMENT.md](DOCUMENT.md)
 
+# Пример
+- [EXAMPLE.md](EXAMPLE.md)
+
 ## 🚀 Основные возможности
 
 - **Векторное хранение данных** - эффективное хранение и поиск по векторным эмбеддингам
@@ -279,3 +282,252 @@ System.out.println("Chunker config: " + chunker.getConfigInfo());
 ---
 
 **Примечание**: Для полной функциональности требуется запущенный Ollama сервер с установленными моделями.
+На основе анализа нового функционала, я дополню README.md следующими разделами:
+
+## 🔍 Дополнения к README.md
+
+Добавьте следующие разделы в существующий README.md файл:
+
+### 🌳 Новые структуры данных
+
+#### BinaryTreeNode
+```java
+// Бинарное дерево для специализированных операций
+BinaryTreeNode binaryTree = new BinaryTreeNode();
+// Используется для оптимизированного хранения и поиска в иерархических структурах
+```
+
+### 🧩 Расширенный Semantic Chunking
+
+#### Улучшенный семантический чанкинг
+```java
+SemanticChunker chunker = new SemanticChunker(
+    "http://localhost:11434",
+    "all-minilm:22m", 
+    0.8
+);
+
+// Расширенное управление чанкингом
+chunker.setSimilarityThreshold(0.7); // Динамическое изменение порога
+
+// Детальная информация о конфигурации
+String configInfo = chunker.getConfigInfo();
+System.out.println(configInfo);
+// Output: SemanticChunker Config: model=all-minilm:22m, similarityThreshold=0.70, url=http://localhost:11434
+
+// Получение информации о модели
+String embeddingModel = chunker.getEmbeddingModel();
+String ollamaUrl = chunker.getOllamaBaseUrl();
+```
+
+#### Работа с чанками
+```java
+List<SemanticChunker.Chunk> chunks = chunker.semanticChunking(text, 1000);
+
+for (SemanticChunker.Chunk chunk : chunks) {
+    System.out.println(chunk.getFullInfo());
+    // Output: 
+    // === CHUNK INFO ===
+    // Position: 0
+    // Length: 156 characters
+    // Text:
+    // Текст чанка...
+    
+    System.out.println("Position: " + chunk.getPosition());
+    System.out.println("Length: " + chunk.getLength());
+    System.out.println("Text: " + chunk.getText());
+    float[] embedding = chunk.getEmbedding();
+}
+```
+
+### 🗂️ Усовершенствованная работа с TreeNode
+
+#### Расширенные возможности TreeNode
+```java
+TreeNode root = new TreeNode();
+
+// Сериализация в JSON
+String jsonString = root.toJsonString();
+JSONObject json = root.toJson();
+
+// Восстановление из JSON
+TreeNode fromJson = TreeNode.fromJsonString(jsonString);
+TreeNode fromJsonObject = TreeNode.fromJson(json);
+
+// Работа с метаданными
+root.setMetadata("author", "John Doe");
+root.setMetadata("version", "1.0");
+Object author = root.getMetadata("author");
+Map<String, Object> allMetadata = root.getMetadata();
+
+// Поиск путей к значениям
+List<Object> path = root.getPathToNode("targetValue");
+boolean contains = root.containsValue("searchValue");
+
+// Глубина и ширина дерева
+int depth = root.getDepth();
+int width = root.getWidth();
+
+// Получение листовых значений
+List<Object> leafValues = root.getLeafValues();
+
+// Поиск поддерева
+TreeNode subtree = root.findSubtree(new Object[]{"users", "user1"});
+
+// Слияние деревьев
+TreeNode otherTree = new TreeNode();
+root.mergeWith(otherTree);
+
+// Визуальное представление
+String treeString = root.toTreeString();
+System.out.println(treeString);
+// Output:
+// └── rootData
+//     ├── child1
+//     │   └── grandchild1
+//     └── child2
+
+// Создание из различных источников
+Map<String, Object> flatMap = root.toFlatMap();
+TreeNode fromMap = TreeNode.createFromMap(flatMap);
+```
+
+### 🎯 Продвинутые демонстрационные примеры
+
+#### AdvancedPromptDemo - Реальные сценарии использования
+```java
+// Комплексная демонстрация PromptGenerator
+AdvancedPromptDemo.main(args);
+
+// Сценарии включают:
+// - Техническая поддержка
+// - Обучение разработчиков  
+// - Подготовка к собеседованиям
+// - Оптимизация промптов
+// - Интеграция знаний из multiple источников
+```
+
+#### ConfigKnowledgeDemo - Управление конфигурацией
+```java
+// Расширенное управление конфигурацией Knowledge системы
+ConfigKnowledgeDemo.main(args);
+
+// Возможности:
+// - Создание KnowledgeConfig различными способами
+// - Интеграция с VectorDatabase
+// - Валидация конфигурации
+// - Динамическое изменение настроек
+// - Работа с multiple конфигурациями
+```
+
+### 🔧 Улучшенная работа с VectorData
+
+#### Расширенная сериализация VectorData
+```java
+VectorData vectorData = new VectorData();
+
+// JSON сериализация
+JSONObject json = vectorData.toJson();
+VectorData fromJson = VectorData.fromJson(json);
+
+// Расширенная информация
+String debugInfo = vectorData.toString();
+// Output: VectorData{id='doc_001_chunk_0', text='Текст...', nodePath='[documents, ml]', ...}
+```
+
+### 🚀 Новые демо-классы
+
+#### Полный набор демонстраций
+```java
+// Базовые демо
+VectorDBExample.main(args);        // Основная функциональность
+EmbeddingDemo.main(args);          // Работа с эмбеддингами
+KnowledgeDemo.main(args);          // Загрузка знаний
+
+// Продвинутые демо  
+AdvancedPromptDemo.main(args);     // Реальные сценарии промптов
+ConfigKnowledgeDemo.main(args);    // Управление конфигурацией
+OllamaChatDemo.main(args);         // Интерактивный чат с RAG
+PromptGeneratorDemo.main(args);    // Генерация промптов
+KnowledgeExample.main(args);       // Комплексный пример знаний
+```
+
+### 📊 Расширенная статистика и мониторинг
+
+#### Мониторинг производительности
+```java
+// Статистика SemanticChunker
+String chunkerConfig = chunker.getConfigInfo();
+double currentThreshold = chunker.getSimilarityThreshold();
+
+// Статистика базы данных
+int vectorCount = vectorDB.getVectorCount();
+int nodeCount = vectorDB.getTreeNodeCount();
+
+// Детальная информация о чанках
+List<VectorData> allVectors = vectorDB.exactSearch("");
+for (VectorData vector : allVectors) {
+    System.out.println("ID: " + vector.getId());
+    System.out.println("Document: " + vector.getDocumentId()); 
+    System.out.println("Chunk Index: " + vector.getChunkIndex());
+    System.out.println("Node Path: " + vector.getNodePath());
+    System.out.println("Text: " + vector.getText().substring(0, 50) + "...");
+}
+```
+
+### 🔄 Расширенные сценарии использования
+
+#### Динамическая настройка чанкинга
+```java
+// Адаптивный чанкинг на основе контента
+KnowledgeLoader loader = new KnowledgeLoader(vectorDB, knowledgeConfig);
+
+// Мониторинг текущих настроек
+double currentThreshold = loader.getCurrentSimilarityThreshold();
+String chunkerConfig = loader.getSemanticChunkerConfig();
+
+// Динамическая адаптация
+loader.setSimilarityThreshold(0.6);  // Более агрессивный чанкинг
+loader.printKnowledgeStats();        // Обновленная статистика
+```
+
+#### Многомодельная архитектура
+```java
+// Разные модели для разных задач
+SemanticChunker embeddingChunker = new SemanticChunker(
+    "http://localhost:11434", 
+    "all-minilm:22m",  // Для эмбеддингов
+    0.8
+);
+
+KnowledgeConfig generationConfig = new KnowledgeConfig(
+    "http://localhost:11434",
+    "llama3.2",        // Для генерации
+    0.8, true, true
+);
+
+// Специализированные клиенты
+OllamaKnowledgeClient knowledgeClient = new OllamaKnowledgeClient(
+    vectorDB, generationConfig
+);
+```
+
+### 🛠️ Утилиты и вспомогательные методы
+
+#### Вспомогательные функции TreeNode
+```java
+// Поиск по шаблону
+List<Map.Entry<List<Object>, Object>> patternResults = 
+    root.findValuesByPattern("searchPattern");
+
+// Плоское представление
+Map<String, Object> flatMap = root.toFlatMap();
+
+// Глубокое копирование
+TreeNode copy = root.deepCopy();
+
+// Статические конструкторы
+Map<List<Object>, Object> paths = new HashMap<>();
+TreeNode fromPaths = TreeNode.createFromPaths(paths);
+```
+

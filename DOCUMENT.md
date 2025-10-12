@@ -1,1041 +1,809 @@
-# VectorDB - Полная документация
+# VectorDB - Полная документация 
 
 ## Оглавление
 1. [Введение](#введение)
 2. [Архитектура системы](#архитектура-системы)
 3. [Быстрый старт](#быстрый-старт)
 4. [Детальное описание компонентов](#детальное-описание-компонентов)
-5. [Примеры использования](#примеры-использования)
-6. [Конфигурация](#конфигурация)
-7. [Лучшие практики](#лучшие-практики)
-8. [Устранение неполадок](#устранение-неполадок)
+5. [Новый функционал](#новый-функционал)
+6. [Примеры использования](#примеры-использования)
+7. [Конфигурация](#конфигурация)
+8. [Лучшие практики](#лучшие-практики)
+9. [Устранение неполадок](#устранение-неполадок)
 
-## Введение
+## Новый функционал
 
-VectorDB - это Java-библиотека для создания и управления векторными базами данных с поддержкой семантического поиска и Retrieval-Augmented Generation (RAG). Система предназначена для работы с текстовыми данными, их векторным представлением и интеллектуальным поиском.
+### 🌳 BinaryTreeNode - Бинарное дерево
 
-### Ключевые особенности
-- **Семантический поиск** - поиск документов по смысловому сходству
-- **Интеллектуальное чанкинг** - автоматическое разбиение текста на смысловые фрагменты
-- **Интеграция с LLM** - работа с локальными моделями через Ollama
-- **Гибкое хранение** - древовидная структура для сложных данных
-- **RAG-готовность** - готовые компоненты для RAG-приложений
+Новый класс для оптимизированного хранения иерархических данных.
 
-## Архитектура системы
-
-### Основные компоненты
-
-```
-VectorDB Architecture:
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Knowledge     │    │   Vector Database│    │   Ollama        │
-│    Loader       │───▶│     Core         │───▶│   Integration   │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│  Text Chunking  │    │  Vector Index    │    │  Prompt Generation│
-│  & Embedding    │    │  & Search        │    │  & RAG          │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-```
-
-### Поток данных
-1. **Загрузка текста** → SemanticChunker → Векторные эмбеддинги
-2. **Сохранение** → VectorDatabase + TreeNode
-3. **Поиск** → VectorIndex → Релевантные документы
-4. **Генерация** → PromptGenerator → Ollama → Ответ
-
-## Быстрый старт
-
-### Предварительные требования
-
-```bash
-# Установка Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
-
-# Загрузка моделей
-ollama pull llama3.2
-ollama pull all-minilm:22m
-ollama pull deepseek-v3.1:671b-cloud
-
-# Проверка установки
-ollama list
-```
-
-### Базовая настройка проекта
-
-#### Maven зависимость
-```xml
-<dependencies>
-    <dependency>
-        <groupId>org.json</groupId>
-        <artifactId>json</artifactId>
-        <version>20231013</version>
-    </dependency>
-</dependencies>
-```
-
-#### Минимальный рабочий пример
+#### Создание и использование
 ```java
-package com.example.vectordb;
-
-import ru.miacomsoft.vectordb.core.SemanticChunker;
-import ru.miacomsoft.vectordb.core.VectorDatabase;
-import ru.miacomsoft.vectordb.core.VectorSearchResult;
-import java.util.List;
-
-public class QuickStart {
-    public static void main(String[] args) {
-        try {
-            // 1. Инициализация компонентов
-            SemanticChunker chunker = new SemanticChunker(
-                "http://localhost:11434",
-                "all-minilm:22m",
-                0.8
-            );
-            
-            VectorDatabase vectorDB = new VectorDatabase("./data/mydb", chunker);
-            
-            // 2. Загрузка данных
-            String document = """
-                Искусственный интеллект - это область компьютерных наук, 
-                занимающаяся созданием машин, способных выполнять задачи, 
-                требующие человеческого интеллекта. Машинное обучение является 
-                подразделом ИИ и фокусируется на алгоритмах, обучающихся на данных.
-                """;
-                
-            vectorDB.storeTextWithChunking(
-                document,
-                "ai_intro",
-                new Object[]{"knowledge", "artificial_intelligence"}
-            );
-            
-            // 3. Поиск
-            List<VectorSearchResult> results = vectorDB.similaritySearch(
-                "что такое машинное обучение?", 3
-            );
-            
-            // 4. Вывод результатов
-            for (VectorSearchResult result : results) {
-                System.out.printf("Схожесть: %.4f%n", result.getSimilarity());
-                System.out.println("Текст: " + result.getVectorData().getText());
-                System.out.println("---");
-            }
-            
-            vectorDB.close();
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-}
+BinaryTreeNode binaryTree = new BinaryTreeNode();
+// Используется для специализированных операций с бинарными деревьями
+// Оптимизировано для быстрого поиска и вставки
 ```
 
-## Детальное описание компонентов
+### 🧩 Расширенный SemanticChunker
 
-### 1. SemanticChunker
-
-Класс для семантического разбиения текста на чанки.
-
-#### Конструктор
+#### Улучшенное управление конфигурацией
 ```java
 SemanticChunker chunker = new SemanticChunker(
-    "http://localhost:11434",  // URL Ollama
-    "all-minilm:22m",          // модель для эмбеддингов
-    0.8                        // порог схожести (0.0-1.0)
-);
-```
-
-#### Основные методы
-```java
-// Разбиение текста на семантические чанки
-List<SemanticChunker.Chunk> chunks = chunker.semanticChunking(
-    "Длинный текст для разбиения...", 
-    1000  // максимальный размер чанка
+    "http://localhost:11434",
+    "all-minilm:22m", 
+    0.8
 );
 
-// Получение эмбеддинга для текста
-float[] embedding = chunker.getEmbedding("Текст для векторизации");
+// Получение информации о конфигурации
+String configInfo = chunker.getConfigInfo();
+System.out.println(configInfo);
+// Output: SemanticChunker Config: model=all-minilm:22m, similarityThreshold=0.80, url=http://localhost:11434
 
-// Расчет косинусной схожести
-double similarity = chunker.cosineSimilarity(embedding1, embedding2);
-
-// Настройка порога
-chunker.setSimilarityThreshold(0.7);
+// Получение информации о модели
+String embeddingModel = chunker.getEmbeddingModel();
+String ollamaUrl = chunker.getOllamaBaseUrl();
+double currentThreshold = chunker.getSimilarityThreshold();
 ```
 
-#### Пример работы с чанками
+#### Расширенная работа с чанками
 ```java
-List<SemanticChunker.Chunk> chunks = chunker.semanticChunking(text, 500);
+List<SemanticChunker.Chunk> chunks = chunker.semanticChunking(text, 1000);
 
 for (SemanticChunker.Chunk chunk : chunks) {
-    System.out.println("Позиция: " + chunk.getPosition());
-    System.out.println("Длина: " + chunk.getLength());
-    System.out.println("Текст: " + chunk.getText());
-    System.out.println("Эмбеддинг: " + Arrays.toString(chunk.getEmbedding()));
-    System.out.println("---");
+    // Детальная информация о чанке
+    System.out.println(chunk.getFullInfo());
+    // Output: 
+    // === CHUNK INFO ===
+    // Position: 0
+    // Length: 156 characters
+    // Text:
+    // Текст чанка...
+    
+    // Отдельные свойства
+    System.out.println("Position: " + chunk.getPosition());
+    System.out.println("Length: " + chunk.getLength());
+    System.out.println("Text: " + chunk.getText());
+    float[] embedding = chunk.getEmbedding();
 }
 ```
 
-### 2. VectorDatabase
+### 🗂️ Усовершенствованный TreeNode
 
-Основной класс для работы с векторной базой данных.
-
-#### Инициализация
+#### Расширенная сериализация
 ```java
-VectorDatabase vectorDB = new VectorDatabase(
-    "./data/mydatabase",  // путь к данным
-    semanticChunker       // экземпляр SemanticChunker
-);
-```
-
-#### Методы хранения данных
-```java
-// Базовое сохранение текста с автоматическим чанкингом
-vectorDB.storeTextWithChunking(
-    "Текст для сохранения...",
-    "document_001",           // ID документа
-    new Object[]{"category", "subcategory"}  // путь в дереве
-);
-
-// Прямое сохранение VectorData
-VectorData vectorData = new VectorData(
-    "chunk_001",
-    embedding,               // float[] эмбеддинг
-    originalData,           // исходные данные
-    "Текст чанка",          // текст
-    "path.to.chunk",        // путь узла
-    "doc_001",              // ID документа
-    0                       // индекс чанка
-);
-vectorDB.storeVectorData(vectorData);
-
-// Сохранение TreeNode
-TreeNode node = new TreeNode("Значение узла");
-vectorDB.storeTreeNode("node_001", node, new Object[]{"tree", "node"});
-```
-
-#### Методы поиска
-```java
-// Семантический поиск по тексту
-List<VectorSearchResult> semanticResults = vectorDB.similaritySearch(
-    "поисковый запрос", 
-    10  // лимит результатов
-);
-
-// Семантический поиск по вектору
-float[] queryVector = chunker.getEmbedding("запрос");
-List<VectorSearchResult> vectorResults = vectorDB.similaritySearch(
-    queryVector, 
-    10
-);
-
-// Точный текстовый поиск
-List<VectorData> exactResults = vectorDB.exactSearch("ключевое слово");
-
-// Поиск по пути
-List<VectorData> pathResults = vectorDB.searchByPath("category.subcategory");
-```
-
-#### Управление данными
-```java
-// Получение данных
-VectorData data = vectorDB.getVectorData("chunk_001");
-TreeNode node = vectorDB.getTreeNode("node_001");
-
-// Удаление данных
-vectorDB.removeVectorData("chunk_001");
-vectorDB.removeTreeNode("node_001");
-
-// Статистика
-int vectorCount = vectorDB.getVectorCount();
-int nodeCount = vectorDB.getTreeNodeCount();
-
-// Сохранение базы
-vectorDB.saveDatabase();
-vectorDB.close();  // автоматическое сохранение при закрытии
-```
-
-### 3. TreeNode
-
-Гибкая древовидная структура для хранения данных.
-
-#### Создание и базовые операции
-```java
-// Создание дерева
 TreeNode root = new TreeNode();
 
-// Установка значений по пути
-root.setNode(new Object[]{"users", "john", "profile", "name"}, "John Doe");
-root.setNode(new Object[]{"users", "john", "profile", "age"}, 30);
-root.setNode(new Object[]{"users", "john", "settings", "theme"}, "dark");
+// Сериализация в JSON
+String jsonString = root.toJsonString();
+JSONObject json = root.toJson();
 
-// Получение значений
-String name = (String) root.getNode(new Object[]{"users", "john", "profile", "name"});
-Integer age = (Integer) root.getNode(new Object[]{"users", "john", "profile", "age"});
-
-// Удаление узлов
-root.removeNode(new Object[]{"users", "john", "settings", "theme"});
+// Восстановление из JSON
+TreeNode fromJson = TreeNode.fromJsonString(jsonString);
+TreeNode fromJsonObject = TreeNode.fromJson(json);
 ```
 
-#### Поиск и запросы
+#### Работа с метаданными
 ```java
-// Поиск с глубиной
-List<TreeNode.QueryResult> results = root.query(
-    new Object[]{"users", "john"},  // путь
-    2                              // глубина поиска
-);
+// Установка метаданных
+root.setMetadata("author", "John Doe");
+root.setMetadata("version", "1.0");
+root.setMetadata("created", "2024-01-01");
 
-for (TreeNode.QueryResult result : results) {
-    System.out.println("Путь: " + result.getPathString());
-    System.out.println("Значение: " + result.getValue());
-}
+// Получение метаданных
+Object author = root.getMetadata("author");
+Map<String, Object> allMetadata = root.getMetadata();
+boolean hasMetadata = root.hasMetadata("author");
 
-// Поиск значений
-List<Map.Entry<List<Object>, Object>> foundValues = root.findValues("John Doe");
+// Удаление метаданных
+root.removeMetadata("author");
+root.clearMetadata();
+```
+
+#### Расширенный поиск и навигация
+```java
+// Поиск пути к значению
+List<Object> path = root.getPathToNode("targetValue");
+
+// Проверка наличия значения
+boolean contains = root.containsValue("searchValue");
+
+// Получение всех путей
+Map<List<Object>, Object> allPaths = root.getAllPaths();
 
 // Поиск по шаблону
 List<Map.Entry<List<Object>, Object>> patternResults = 
-    root.findValuesByPattern("john");
+    root.findValuesByPattern("searchPattern");
 ```
 
-#### Расширенные возможности
+#### Анализ структуры дерева
 ```java
-// Метаданные
-root.setMetadata("created", "2024-01-01");
-root.setMetadata("version", "1.0");
-String created = (String) root.getMetadata("created");
-
-// Сериализация в JSON
-String json = root.toJsonString();
-TreeNode restored = TreeNode.fromJsonString(json);
-
-// Статистика дерева
+// Основные метрики
 int totalNodes = root.countNodes();
 int depth = root.getDepth();
 int width = root.getWidth();
+
+// Работа с листьями
 List<Object> leafValues = root.getLeafValues();
 
-// Визуализация
-System.out.println(root.toTreeString());
+// Поиск поддерева
+TreeNode subtree = root.findSubtree(new Object[]{"users", "user1"});
 ```
 
-### 4. KnowledgeLoader
-
-Загрузчик текстовых знаний в векторную базу.
-
-#### Инициализация
+#### Операции с деревьями
 ```java
-KnowledgeConfig config = new KnowledgeConfig(
-    "http://localhost:11434",
-    "llama3.2",
-    0.8,
-    true,
-    true
-);
+// Слияние деревьев
+TreeNode otherTree = new TreeNode();
+root.mergeWith(otherTree);
 
-KnowledgeLoader loader = new KnowledgeLoader(vectorDB, config);
+// Глубокое копирование
+TreeNode copy = root.deepCopy();
+
+// Визуальное представление
+String treeString = root.toTreeString();
+System.out.println(treeString);
+// Output:
+// └── rootData
+//     ├── child1
+//     │   └── grandchild1
+//     └── child2
 ```
 
-#### Загрузка данных
+#### Статические конструкторы
 ```java
-// Загрузка текстовой строки
-int chunksCount = loader.loadText(
-    "Длинный текст с знаниями...",
-    "knowledge_base",
-    new Object[]{"domain", "topic"},
-    500,      // максимальный размер чанка
-    "source"  // имя источника
-);
+// Создание из Map
+Map<String, Object> map = new HashMap<>();
+map.put("key1", "value1");
+map.put("key2", "value2");
+TreeNode fromMap = TreeNode.createFromMap(map);
 
-// Загрузка файла
-int fileChunks = loader.loadTextFile(
-    "/path/to/document.txt",
-    "document_001",
-    new Object[]{"documents", "ai"},
-    500
-);
+// Создание из путей
+Map<List<Object>, Object> paths = new HashMap<>();
+paths.put(Arrays.asList("users", "user1"), "John Doe");
+TreeNode fromPaths = TreeNode.createFromPaths(paths);
 
-// Загрузка директории
-String[] extensions = {".txt", ".md", ".json"};
-int totalChunks = loader.loadTextDirectory(
-    "/path/to/documents/",
-    "docs",
-    new Object[]{"library"},
-    500,
-    extensions
-);
+// Плоское представление
+Map<String, Object> flatMap = root.toFlatMap();
 ```
 
-#### Управление загрузкой
+### 🎯 Продвинутые демонстрационные примеры
+
+#### AdvancedPromptDemo - Реальные сценарии
 ```java
-// Настройка порога схожести
-loader.setSimilarityThreshold(0.9);
+// Комплексная демонстрация работы с промптами
+AdvancedPromptDemo.main(args);
+
+// Включает сценарии:
+// - Техническая поддержка с реальными данными
+// - Обучение новых разработчиков
+// - Подготовка к техническим собеседованиям
+// - Оптимизация параметров промптов
+// - Интеграция знаний из multiple источников
+```
+
+#### ConfigKnowledgeDemo - Управление конфигурацией
+```java
+// Расширенное управление конфигурацией Knowledge системы
+ConfigKnowledgeDemo.main(args);
+
+// Возможности:
+// - Создание KnowledgeConfig различными способами
+// - Интеграция с VectorDatabase
+// - Валидация конфигурации
+// - Динамическое изменение настроек
+// - Работа с multiple конфигурациями для разных сценариев
+```
+
+### 🔧 Улучшенная работа с VectorData
+
+#### Расширенная сериализация
+```java
+VectorData vectorData = new VectorData();
+
+// JSON сериализация
+JSONObject json = vectorData.toJson();
+VectorData fromJson = VectorData.fromJson(json);
+
+// Расширенная отладочная информация
+String debugInfo = vectorData.toString();
+// Output: VectorData{id='doc_001_chunk_0', text='Текст...', nodePath='[documents, ml]', ...}
+```
+
+### 🚀 Полный набор демонстрационных классов
+
+#### Базовые демонстрации
+```java
+// Основная функциональность
+VectorDBExample.main(args);
+
+// Работа с эмбеддингами
+EmbeddingDemo.main(args);
+
+// Загрузка и использование знаний
+KnowledgeDemo.main(args);
+KnowledgeExample.main(args);
+```
+
+#### Продвинутые демонстрации
+```java
+// Реальные сценарии использования промптов
+AdvancedPromptDemo.main(args);
+
+// Управление конфигурацией системы
+ConfigKnowledgeDemo.main(args);
+
+// Интерактивный чат с RAG функциональностью
+OllamaChatDemo.main(args);
+
+// Генерация и оптимизация промптов
+PromptGeneratorDemo.main(args);
+```
+
+### 📊 Расширенная статистика и мониторинг
+
+#### Мониторинг SemanticChunker
+```java
+// Детальная информация о конфигурации
+String chunkerConfig = chunker.getConfigInfo();
+double currentThreshold = chunker.getSimilarityThreshold();
+
+// Статистика использования
+System.out.println("Current similarity threshold: " + currentThreshold);
+System.out.println("Embedding model: " + chunker.getEmbeddingModel());
+System.out.println("Ollama URL: " + chunker.getOllamaBaseUrl());
+```
+
+#### Детальная информация о данных
+```java
+// Полная статистика базы данных
+int vectorCount = vectorDB.getVectorCount();
+int nodeCount = vectorDB.getTreeNodeCount();
+
+// Детальная информация о чанках
+List<VectorData> allVectors = vectorDB.exactSearch("");
+for (VectorData vector : allVectors) {
+    System.out.println("ID: " + vector.getId());
+    System.out.println("Document: " + vector.getDocumentId()); 
+    System.out.println("Chunk Index: " + vector.getChunkIndex());
+    System.out.println("Node Path: " + vector.getNodePath());
+    System.out.println("Timestamp: " + vector.getTimestamp());
+    System.out.println("Text: " + vector.getText().substring(0, 50) + "...");
+}
+```
+
+### 🔄 Расширенные сценарии использования
+
+#### Динамическая адаптация чанкинга
+```java
+KnowledgeLoader loader = new KnowledgeLoader(vectorDB, knowledgeConfig);
+
+// Мониторинг текущих настроек
 double currentThreshold = loader.getCurrentSimilarityThreshold();
-
-// Статистика
-loader.printKnowledgeStats();
-
-// Конфигурация
-Map<String, Object> config = loader.getKnowledgeConfig();
 String chunkerConfig = loader.getSemanticChunkerConfig();
+
+// Динамическая адаптация под тип контента
+loader.setSimilarityThreshold(0.6);  // Более агрессивный чанкинг для технических текстов
+loader.setSimilarityThreshold(0.9);  // Более консервативный для юридических документов
+
+// Обновленная статистика после изменений
+loader.printKnowledgeStats();
 ```
 
-### 5. OllamaKnowledgeClient
-
-Клиент для работы с Ollama и RAG-функциональностью.
-
-#### Инициализация
+#### Многомодельная архитектура
 ```java
-OllamaKnowledgeClient client = new OllamaKnowledgeClient(vectorDB, config);
-
-// Кастомная настройка
-client.setDefaultModel("deepseek-v3.1:671b-cloud");
-client.setSimilarityThreshold(0.7);
-client.setMaxContextResults(5);
-```
-
-#### Основные методы
-```java
-// Поиск релевантных фактов
-List<String> facts = client.findRelevantFacts("запрос", 5);
-
-// Базовая генерация ответа
-String response = client.generateResponse("Вопрос без контекста");
-
-// Генерация с использованием знаний (RAG)
-String ragResponse = client.generateResponseWithKnowledge(
-    "Что такое машинное обучение?"
+// Специализированные модели для разных задач
+SemanticChunker embeddingChunker = new SemanticChunker(
+    "http://localhost:11434", 
+    "all-minilm:22m",  // Оптимизирована для эмбеддингов
+    0.8
 );
 
-// Потоковая генерация
-Iterator<String> stream = client.generateResponseStream("запрос");
-while (stream.hasNext()) {
-    System.out.print(stream.next());
+KnowledgeConfig generationConfig = new KnowledgeConfig(
+    "http://localhost:11434",
+    "llama3.2",        // Оптимизирована для генерации
+    0.8, true, true
+);
+
+KnowledgeConfig analysisConfig = new KnowledgeConfig(
+    "http://localhost:11434", 
+    "deepseek-v3.1:671b-cloud",  // Для сложного анализа
+    0.7, true, true
+);
+
+// Специализированные клиенты для разных задач
+OllamaKnowledgeClient knowledgeClient = new OllamaKnowledgeClient(vectorDB, generationConfig);
+OllamaKnowledgeClient analysisClient = new OllamaKnowledgeClient(vectorDB, analysisConfig);
+```
+
+### 🛠️ Утилиты и вспомогательные методы
+
+#### Вспомогательные функции TreeNode
+```java
+// Расширенный поиск
+List<Map.Entry<List<Object>, Object>> patternResults = 
+    root.findValuesByPattern("searchPattern");
+
+// Плоское представление для экспорта
+Map<String, Object> flatMap = root.toFlatMap();
+
+// Глубокое копирование для безопасного изменения
+TreeNode copy = root.deepCopy();
+
+// Статические конструкторы для быстрого создания
+Map<List<Object>, Object> paths = new HashMap<>();
+TreeNode fromPaths = TreeNode.createFromPaths(paths);
+```
+
+#### Управление версиями и метаданными
+```java
+// Комплексная работа с метаданными
+root.setMetadata("version", "1.0.0");
+root.setMetadata("author", "Development Team");
+root.setMetadata("created", "2024-01-01");
+root.setMetadata("lastModified", "2024-01-15");
+
+// Валидация структуры данных
+if (root.hasMetadata("version")) {
+    String version = (String) root.getMetadata("version");
+    System.out.println("Working with version: " + version);
 }
 ```
 
-#### Интерактивный режим
-```java
-// Запуск интерактивного чата
-client.startInteractiveChat();
+## Примеры использования нового функционала
 
-// Пример сессии:
-// You: Что такое искусственный интеллект?
-// AI: [генерирует ответ на основе знаний из базы]
-// You: Какие есть типы машинного обучения?
-// AI: [использует найденные релевантные документы]
-```
-
-### 6. PromptGenerator
-
-Генератор промптов для AI с использованием семантического поиска.
-
-#### Использование
-```java
-PromptGenerator promptGenerator = new PromptGenerator(vectorDB, config);
-
-// Контекстный промпт
-String contextPrompt = promptGenerator.createContextPrompt(
-    "Вопрос пользователя",
-    3,    // максимальное количество результатов на чанк
-    0.7   // порог схожести
-);
-
-// Генерация вопросов
-String questionPrompt = promptGenerator.createQuestionGenerationPrompt(
-    "тема для вопросов",
-    5,    // количество вопросов
-    0.6   // порог схожести
-);
-
-// Суммаризация
-String summaryPrompt = promptGenerator.createSummarizationPrompt(
-    "тема для суммаризации",
-    4,    // максимальное количество контекстных элементов
-    0.65  // порог схожести
-);
-```
-
-## Примеры использования
-
-### Пример 1: Построение базы знаний компании
+### Пример 4: Система управления конфигурацией с расширенным TreeNode
 
 ```java
-public class CompanyKnowledgeBase {
-    private VectorDatabase vectorDB;
-    private KnowledgeLoader loader;
+public class AdvancedConfigurationManager {
+    private TreeNode configTree;
     
-    public CompanyKnowledgeBase() throws Exception {
-        KnowledgeConfig config = new KnowledgeConfig(
-            "http://localhost:11434", "llama3.2", 0.8, true, true
-        );
-        
-        SemanticChunker chunker = new SemanticChunker(
-            "http://localhost:11434", "all-minilm:22m", 0.8
-        );
-        
-        this.vectorDB = new VectorDatabase("./data/company_kb", chunker);
-        this.loader = new KnowledgeLoader(vectorDB, config);
+    public AdvancedConfigurationManager() {
+        this.configTree = new TreeNode();
+        initializeDefaultConfig();
     }
     
-    public void loadCompanyDocuments() throws Exception {
-        // Документация по продуктам
-        String productDocs = """
-            Наш продукт AI Assistant помогает автоматизировать 
-            обработку клиентских запросов. Основные функции:
-            - Анализ естественного языка
-            - Интеграция с CRM системами
-            - Автоматическая классификация запросов
-            - Генерация персонализированных ответов
-            
-            Технические требования:
-            - Java 11 или выше
-            - 4GB RAM минимум
-            - Поддержка Docker
-            """;
-            
-        loader.loadText(productDocs, "product_docs", 
-            new Object[]{"docs", "products", "ai_assistant"}, 500, "internal");
+    private void initializeDefaultConfig() {
+        // Базовая конфигурация с метаданными
+        configTree.setNode(new Object[]{"database", "url"}, "jdbc:postgresql://localhost:5432/mydb");
+        configTree.setNode(new Object[]{"database", "username"}, "admin");
+        configTree.setNode(new Object[]{"database", "password"}, "secret");
+        configTree.setNode(new Object[]{"server", "port"}, 8080);
+        configTree.setNode(new Object[]{"server", "host"}, "localhost");
         
-        // Процедуры поддержки
-        String supportProcedures = """
-            Процедура эскалации критических инцидентов:
-            1. Первичная оценка приоритета - 15 минут
-            2. Уведомление тимлида - 5 минут
-            3. Создание задачи в JIRA - немедленно
-            4. Коммуникация с клиентом - каждые 2 часа
-            
-            SLA для различных приоритетов:
-            - P0: 1 час response time
-            - P1: 4 часа response time  
-            - P2: 1 рабочий день
-            - P3: 3 рабочих дня
-            """;
-            
-        loader.loadText(supportProcedures, "support_procedures",
-            new Object[]{"docs", "support", "procedures"}, 400, "internal");
+        // Метаданные конфигурации
+        configTree.setMetadata("configVersion", "2.1.0");
+        configTree.setMetadata("createdBy", "System Administrator");
+        configTree.setMetadata("environment", "production");
     }
     
-    public String askQuestion(String question) throws Exception {
-        OllamaKnowledgeClient client = new OllamaKnowledgeClient(vectorDB, 
-            new KnowledgeConfig("http://localhost:11434", "llama3.2", 0.8, true, true));
-        
-        return client.generateResponseWithKnowledge(question);
+    public void saveConfigToFile(String filePath) throws IOException {
+        String jsonConfig = configTree.toJsonString();
+        Files.write(Paths.get(filePath), jsonConfig.getBytes());
+        System.out.println("Configuration saved to: " + filePath);
     }
     
-    public static void main(String[] args) throws Exception {
-        CompanyKnowledgeBase kb = new CompanyKnowledgeBase();
-        kb.loadCompanyDocuments();
-        
-        // Примеры вопросов
-        System.out.println(kb.askQuestion("Какие SLA для приоритета P1?"));
-        System.out.println(kb.askQuestion("Какие функции у AI Assistant?"));
-        System.out.println(kb.askQuestion("Как происходит эскалация инцидентов?"));
-        
-        kb.vectorDB.close();
-    }
-}
-```
-
-### Пример 2: Образовательная платформа
-
-```java
-public class EducationalPlatform {
-    private VectorDatabase vectorDB;
-    private PromptGenerator promptGenerator;
-    
-    public EducationalPlatform() throws Exception {
-        KnowledgeConfig config = new KnowledgeConfig(
-            "http://localhost:11434", "llama3.2", 0.7, true, true
-        );
-        
-        SemanticChunker chunker = new SemanticChunker(
-            "http://localhost:11434", "all-minilm:22m", 0.7
-        );
-        
-        this.vectorDB = new VectorDatabase("./data/education", chunker);
-        this.promptGenerator = new PromptGenerator(vectorDB, config);
-        
-        loadEducationalContent();
+    public void loadConfigFromFile(String filePath) throws IOException {
+        String jsonConfig = new String(Files.readAllBytes(Paths.get(filePath)));
+        this.configTree = TreeNode.fromJsonString(jsonConfig);
+        System.out.println("Configuration loaded from: " + filePath);
     }
     
-    private void loadEducationalContent() throws Exception {
-        KnowledgeLoader loader = new KnowledgeLoader(vectorDB, 
-            new KnowledgeConfig("http://localhost:11434", "llama3.2", 0.7, true, true));
+    public void printConfigStructure() {
+        System.out.println("=== Configuration Structure ===");
+        System.out.println(configTree.toTreeString());
         
-        // Материалы по программированию
-        String programmingContent = """
-            Объектно-ориентированное программирование (ООП) - это парадигма программирования, 
-            в которой программа представляется в виде совокупности объектов, 
-            каждый из которых является экземпляром определенного класса.
+        System.out.println("=== Metadata ===");
+        configTree.getMetadata().forEach((key, value) -> 
+            System.out.println(key + ": " + value));
             
-            Основные принципы ООП:
-            1. Инкапсуляция - сокрытие внутренней реализации
-            2. Наследование - создание новых классов на основе существующих
-            3. Полиморфизм - возможность объектов с одинаковой спецификацией 
-               иметь различную реализацию
-            4. Абстракция - выделение существенных характеристик объекта
-            
-            Класс - это шаблон для создания объектов, определяющий их структуру и поведение.
-            Объект - экземпляр класса, содержащий данные и методы для работы с ними.
-            """;
-            
-        loader.loadText(programmingContent, "oop_basics",
-            new Object[]{"courses", "programming", "oop"}, 300, "educational");
-            
-        // Материалы по алгоритмам
-        String algorithmsContent = """
-            Алгоритмы сортировки - методы упорядочивания элементов в списке.
-            
-            Быстрая сортировка (QuickSort):
-            - Сложность: O(n log n) в среднем случае, O(n²) в худшем
-            - Стратегия: "разделяй и властвуй"
-            - Выбор опорного элемента критически важен для производительности
-            
-            Сортировка слиянием (MergeSort):
-            - Сложность: O(n log n) в любом случае
-            - Требует дополнительной памяти O(n)
-            - Стабильная сортировка
-            """;
-            
-        loader.loadText(algorithmsContent, "sorting_algorithms",
-            new Object[]{"courses", "algorithms", "sorting"}, 350, "educational");
+        System.out.println("=== Statistics ===");
+        System.out.println("Total nodes: " + configTree.countNodes());
+        System.out.println("Tree depth: " + configTree.getDepth());
+        System.out.println("Tree width: " + configTree.getWidth());
     }
     
-    public void generateStudyQuestions(String topic, int count) throws Exception {
-        String prompt = promptGenerator.createQuestionGenerationPrompt(
-            topic, count, 0.6
-        );
-        
-        System.out.println("=== ВОПРОСЫ ДЛЯ ИЗУЧЕНИЯ ===");
-        System.out.println("Тема: " + topic);
-        System.out.println("Количество: " + count);
-        System.out.println("\n" + prompt);
-    }
-    
-    public void createStudyGuide(String topic) throws Exception {
-        String prompt = promptGenerator.createSummarizationPrompt(
-            topic, 5, 0.65
-        );
-        
-        System.out.println("=== УЧЕБНОЕ ПОСОБИЕ ===");
-        System.out.println("Тема: " + topic);
-        System.out.println("\n" + prompt);
-    }
-    
-    public static void main(String[] args) throws Exception {
-        EducationalPlatform platform = new EducationalPlatform();
-        
-        // Генерация вопросов для самопроверки
-        platform.generateStudyQuestions("ООП принципы", 5);
-        System.out.println("\n" + "=" .repeat(50) + "\n");
-        
-        // Создание учебного пособия
-        platform.createStudyGuide("алгоритмы сортировки");
-        
-        platform.vectorDB.close();
-    }
-}
-```
-
-### Пример 3: Техническая поддержка с RAG
-
-```java
-public class TechnicalSupportBot {
-    private OllamaKnowledgeClient client;
-    private VectorDatabase vectorDB;
-    
-    public TechnicalSupportBot() throws Exception {
-        KnowledgeConfig config = new KnowledgeConfig(
-            "http://localhost:11434", "deepseek-v3.1:671b-cloud", 0.75, true, true
-        );
-        
-        SemanticChunker chunker = new SemanticChunker(
-            "http://localhost:11434", "all-minilm:22m", 0.75
-        );
-        
-        this.vectorDB = new VectorDatabase("./data/support_bot", chunker);
-        this.client = new OllamaKnowledgeClient(vectorDB, config);
-        
-        loadKnowledgeBase();
-    }
-    
-    private void loadKnowledgeBase() throws Exception {
-        KnowledgeLoader loader = new KnowledgeLoader(vectorDB,
-            new KnowledgeConfig("http://localhost:11434", "deepseek-v3.1:671b-cloud", 0.75, true, true));
-        
-        // База знаний по устранению неполадок
-        String troubleshootingKB = """
-            Распространенные проблемы и решения:
+    public void findConfigValues(String pattern) {
+        System.out.println("=== Searching for: " + pattern + " ===");
+        List<Map.Entry<List<Object>, Object>> results = 
+            configTree.findValuesByPattern(pattern);
             
-            Проблема: Приложение не запускается
-            Решение: 
-            1. Проверить установку Java: java -version
-            2. Убедиться в наличии необходимых прав
-            3. Проверить файл конфигурации на ошибки
-            4. Просмотреть логи приложения
-            
-            Проблема: Высокая загрузка памяти
-            Решение:
-            1. Проверить настройки JVM (-Xmx, -Xms)
-            2. Проанализировать дамп памяти
-            3. Проверить наличие утечек памяти
-            4. Оптимизировать использование кэша
-            
-            Проблема: Медленная работа базы данных
-            Решение:
-            1. Проверить индексы таблиц
-            2. Оптимизировать запросы
-            3. Проверить настройки соединения
-            4. Мониторить системные ресурсы
-            """;
-            
-        loader.loadText(troubleshootingKB, "troubleshooting_guide",
-            new Object[]{"support", "troubleshooting"}, 400, "support_kb");
-            
-        // Информация о продукте
-        String productInfo = """
-            Наш продукт SuperApp версии 2.1.0
-            
-            Системные требования:
-            - Операционная система: Windows 10+, Linux, MacOS
-            - Java: версия 11 или выше
-            - Память: минимум 2GB RAM, рекомендуется 4GB
-            - Диск: 500MB свободного места
-            
-            Поддерживаемые базы данных:
-            - PostgreSQL 12+
-            - MySQL 8.0+
-            - MongoDB 4.4+
-            
-            Логирование:
-            - Основные логи: /var/log/superapp/app.log
-            - Логи ошибок: /var/log/superapp/error.log
-            - Уровень логирования настраивается в application.properties
-            """;
-            
-        loader.loadText(productInfo, "product_info",
-            new Object[]{"product", "information"}, 500, "product_docs");
-    }
-    
-    public void handleUserQuery(String userQuery) {
-        try {
-            System.out.println("👤 Пользователь: " + userQuery);
-            System.out.print("🤖 Поддержка: ");
-            
-            // Потоковый ответ для лучшего UX
-            Iterator<String> responseStream = client.generateResponseStream(userQuery);
-            
-            while (responseStream.hasNext()) {
-                System.out.print(responseStream.next());
-            }
-            System.out.println("\n");
-            
-        } catch (Exception e) {
-            System.out.println("❌ Извините, произошла ошибка: " + e.getMessage());
+        for (Map.Entry<List<Object>, Object> result : results) {
+            System.out.println("Path: " + result.getKey() + " -> Value: " + result.getValue());
         }
     }
     
-    public void startSupportSession() {
+    public static void main(String[] args) throws Exception {
+        AdvancedConfigurationManager configManager = new AdvancedConfigurationManager();
+        
+        // Демонстрация возможностей
+        configManager.printConfigStructure();
+        
+        System.out.println("\n" + "=".repeat(50) + "\n");
+        
+        // Поиск конфигурационных значений
+        configManager.findConfigValues("localhost");
+        configManager.findConfigValues("admin");
+        
+        // Сохранение и загрузка
+        configManager.saveConfigToFile("config.json");
+        
+        // Создание новой конфигурации и загрузка
+        AdvancedConfigurationManager newManager = new AdvancedConfigurationManager();
+        newManager.loadConfigFromFile("config.json");
+        newManager.printConfigStructure();
+    }
+}
+```
+
+### Пример 5: Продвинутая система семантического поиска
+
+```java
+public class AdvancedSemanticSearch {
+    private VectorDatabase vectorDB;
+    private SemanticChunker chunker;
+    
+    public AdvancedSemanticSearch() throws Exception {
+        this.chunker = new SemanticChunker(
+            "http://localhost:11434",
+            "all-minilm:22m",
+            0.8
+        );
+        
+        this.vectorDB = new VectorDatabase("./data/advanced_search", chunker);
+        loadSampleData();
+    }
+    
+    private void loadSampleData() throws Exception {
+        // Загрузка разнообразных данных для демонстрации
+        String[] documents = {
+            "Машинное обучение и искусственный интеллект преобразуют современные технологии",
+            "Глубокое обучение использует нейронные сети для решения сложных задач",
+            "Векторные базы данных обеспечивают эффективный семантический поиск",
+            "Java programming language is widely used for enterprise applications",
+            "Spring Framework simplifies development of Java applications",
+            "Базы данных хранят и управляют структурированной информацией"
+        };
+        
+        for (int i = 0; i < documents.length; i++) {
+            vectorDB.storeTextWithChunking(
+                documents[i],
+                "doc_" + i,
+                new Object[]{"documents", "category_" + (i % 3)}
+            );
+        }
+    }
+    
+    public void demonstrateAdvancedSearch() throws Exception {
+        System.out.println("=== Advanced Semantic Search Demo ===");
+        
+        // Демонстрация различных порогов схожести
+        double[] thresholds = {0.5, 0.7, 0.9};
+        String query = "машинное обучение и нейронные сети";
+        
+        for (double threshold : thresholds) {
+            System.out.println("\n--- Similarity Threshold: " + threshold + " ---");
+            
+            chunker.setSimilarityThreshold(threshold);
+            List<VectorSearchResult> results = vectorDB.similaritySearch(query, 3);
+            
+            System.out.println("Found " + results.size() + " results:");
+            for (VectorSearchResult result : results) {
+                System.out.printf("Similarity: %.4f | Text: %s%n",
+                    result.getSimilarity(),
+                    result.getVectorData().getText());
+            }
+        }
+        
+        // Демонстрация информации о конфигурации
+        System.out.println("\n=== Chunker Configuration ===");
+        System.out.println(chunker.getConfigInfo());
+    }
+    
+    public void analyzeChunking(String text) throws Exception {
+        System.out.println("\n=== Text Chunking Analysis ===");
+        System.out.println("Original text length: " + text.length() + " characters");
+        
+        List<SemanticChunker.Chunk> chunks = chunker.semanticChunking(text, 500);
+        
+        System.out.println("Created " + chunks.size() + " chunks:");
+        for (int i = 0; i < chunks.size(); i++) {
+            SemanticChunker.Chunk chunk = chunks.get(i);
+            System.out.println("\nChunk " + (i + 1) + ":");
+            System.out.println("Position: " + chunk.getPosition());
+            System.out.println("Length: " + chunk.getLength());
+            System.out.println("Text preview: " + 
+                chunk.getText().substring(0, Math.min(100, chunk.getText().length())) + "...");
+        }
+    }
+    
+    public static void main(String[] args) throws Exception {
+        AdvancedSemanticSearch search = new AdvancedSemanticSearch();
+        
+        // Демонстрация расширенного поиска
+        search.demonstrateAdvancedSearch();
+        
+        // Анализ чанкинга
+        String testText = """
+            Искусственный интеллект - это область компьютерных наук, которая занимается 
+            созданием интеллектуальных машин, способных выполнять задачи, требующие 
+            человеческого интеллекта. Машинное обучение является подразделом 
+            искусственного интеллекта и focuses на разработке алгоритмов, которые 
+            могут обучаться на данных и делать прогнозы или принимать решения без 
+            явного программирования. Глубокое обучение, в свою очередь, является 
+            подразделом машинного обучения и использует нейронные сети с множеством слоев.
+            """;
+            
+        search.analyzeChunking(testText);
+        
+        search.vectorDB.close();
+    }
+}
+```
+
+### Пример 6: Комплексная система управления знаниями с расширенным функционалом
+
+```java
+public class ComprehensiveKnowledgeManager {
+    private VectorDatabase vectorDB;
+    private KnowledgeLoader knowledgeLoader;
+    private OllamaKnowledgeClient knowledgeClient;
+    private TreeNode knowledgeMetadata;
+    
+    public ComprehensiveKnowledgeManager() throws Exception {
+        KnowledgeConfig config = new KnowledgeConfig(
+            "http://localhost:11434",
+            "llama3.2", 
+            0.8, true, true
+        );
+        
+        SemanticChunker chunker = new SemanticChunker(
+            "http://localhost:11434",
+            "all-minilm:22m",
+            0.8
+        );
+        
+        this.vectorDB = new VectorDatabase("./data/comprehensive_kb", chunker);
+        this.knowledgeLoader = new KnowledgeLoader(vectorDB, config);
+        this.knowledgeClient = new OllamaKnowledgeClient(vectorDB, config);
+        this.knowledgeMetadata = new TreeNode();
+        
+        initializeKnowledgeBase();
+    }
+    
+    private void initializeKnowledgeBase() throws Exception {
+        // Загрузка различных типов знаний
+        loadTechnicalDocumentation();
+        loadBusinessKnowledge();
+        loadProceduralGuidelines();
+        
+        // Инициализация метаданных
+        knowledgeMetadata.setNode(new Object[]{"statistics", "loadedDocuments"}, 3);
+        knowledgeMetadata.setNode(new Object[]{"statistics", "totalChunks"}, 0); // Будет обновлено
+        knowledgeMetadata.setMetadata("knowledgeBaseVersion", "1.0.0");
+        knowledgeMetadata.setMetadata("lastUpdated", new Date().toString());
+    }
+    
+    private void loadTechnicalDocumentation() throws Exception {
+        String techDocs = """
+            Архитектура микросервисов: 
+            Микросервисная архитектура - это подход к разработке приложений 
+            как набора небольших сервисов, каждый из которых работает в своем процессе 
+            и взаимодействует с другими через легковесные механизмы.
+            
+            Преимущества:
+            - Независимое развертывание сервисов
+            - Технологическое разнообразие
+            - Устойчивость к отказам
+            - Масштабируемость
+            
+            Контейнеризация с Docker:
+            Docker позволяет упаковывать приложения и их зависимости в контейнеры,
+            которые могут работать в любой среде с Docker.
+            """;
+            
+        int chunks = knowledgeLoader.loadText(techDocs, "technical_docs",
+            new Object[]{"knowledge", "technical", "architecture"}, 400, "tech_docs");
+            
+        knowledgeMetadata.setNode(new Object[]{"documents", "technical", "chunks"}, chunks);
+    }
+    
+    private void loadBusinessKnowledge() throws Exception {
+        String businessKnowledge = """
+            Бизнес-процессы компании:
+            Основной процесс продаж включает этапы: лидогенерация, квалификация,
+            презентация, заключение сделки и постпродажное обслуживание.
+            
+            Метрики успеха:
+            - Конверсия лидов: 15-20%
+            - Среднее время сделки: 30 дней
+            - Удовлетворенность клиентов: 95%
+            
+            Стратегия роста:
+            Фокус на upsell существующим клиентам и экспансия в новые регионы.
+            """;
+            
+        int chunks = knowledgeLoader.loadText(businessKnowledge, "business_knowledge",
+            new Object[]{"knowledge", "business", "processes"}, 350, "business_kb");
+            
+        knowledgeMetadata.setNode(new Object[]{"documents", "business", "chunks"}, chunks);
+    }
+    
+    private void loadProceduralGuidelines() throws Exception {
+        String procedures = """
+            Процедура код-ревью:
+            1. Проверка кода на соответствие стандартам
+            2. Анализ архитектурных решений
+            3. Проверка тестового покрытия
+            4. Оценка производительности
+            5. Проверка безопасности
+            
+            Стандарты разработки:
+            - Использование Java Code Conventions
+            - Минимальное покрытие тестами 80%
+            - Документирование публичных API
+            - Регулярное рефакторинг кода
+            """;
+            
+        int chunks = knowledgeLoader.loadText(procedures, "procedural_guidelines",
+            new Object[]{"knowledge", "procedures", "development"}, 300, "procedures");
+            
+        knowledgeMetadata.setNode(new Object[]{"documents", "procedures", "chunks"}, chunks);
+    }
+    
+    public void printComprehensiveStats() {
+        System.out.println("=== Comprehensive Knowledge Base Statistics ===");
+        
+        // Статистика векторной базы
+        System.out.println("Vector database statistics:");
+        System.out.println("  Total vectors: " + vectorDB.getVectorCount());
+        System.out.println("  Total tree nodes: " + vectorDB.getTreeNodeCount());
+        
+        // Статистика загрузчика знаний
+        System.out.println("Knowledge loader statistics:");
+        System.out.println("  Current similarity threshold: " + 
+            knowledgeLoader.getCurrentSimilarityThreshold());
+        System.out.println("  Chunker config: " + 
+            knowledgeLoader.getSemanticChunkerConfig());
+        
+        // Метаданные знаний
+        System.out.println("Knowledge metadata:");
+        System.out.println(knowledgeMetadata.toTreeString());
+        
+        // Конфигурация Knowledge
+        Map<String, Object> config = knowledgeLoader.getKnowledgeConfig();
+        System.out.println("Knowledge configuration:");
+        config.forEach((key, value) -> System.out.println("  " + key + ": " + value));
+    }
+    
+    public void interactiveKnowledgeQuery() {
         Scanner scanner = new Scanner(System.in);
-        System.out.println("🎯 Техническая поддержка готова к работе!");
-        System.out.println("Введите ваш вопрос (или 'выход' для завершения):\n");
+        System.out.println("\n🎓 Interactive Knowledge Query Session");
+        System.out.println("Type your questions about technology, business, or procedures");
+        System.out.println("Type 'exit' to end the session\n");
         
         while (true) {
-            System.out.print("> ");
-            String query = scanner.nextLine().trim();
+            System.out.print("❓ Your question: ");
+            String question = scanner.nextLine().trim();
             
-            if (query.equalsIgnoreCase("выход") || 
-                query.equalsIgnoreCase("exit") || 
-                query.equalsIgnoreCase("quit")) {
+            if (question.equalsIgnoreCase("exit")) {
                 break;
             }
             
-            if (!query.isEmpty()) {
-                handleUserQuery(query);
+            if (question.isEmpty()) {
+                continue;
+            }
+            
+            try {
+                // Автоматическая настройка порога в зависимости от типа вопроса
+                if (question.toLowerCase().contains("техн") || 
+                    question.toLowerCase().contains("архитектур")) {
+                    knowledgeLoader.setSimilarityThreshold(0.8); // Высокая точность для тех. вопросов
+                } else if (question.toLowerCase().contains("бизнес") || 
+                          question.toLowerCase().contains("процесс")) {
+                    knowledgeLoader.setSimilarityThreshold(0.7); // Средняя точность для бизнес-вопросов
+                } else {
+                    knowledgeLoader.setSimilarityThreshold(0.6); // Широкий охват для общих вопросов
+                }
+                
+                System.out.print("💡 Answer: ");
+                String response = knowledgeClient.generateResponseWithKnowledge(question);
+                System.out.println(response);
+                System.out.println("(Used similarity threshold: " + 
+                    knowledgeLoader.getCurrentSimilarityThreshold() + ")\n");
+                
+            } catch (Exception e) {
+                System.out.println("❌ Error: " + e.getMessage() + "\n");
             }
         }
         
         scanner.close();
-        System.out.println("✅ Сессия поддержки завершена.");
+        System.out.println("✅ Knowledge query session completed.");
     }
     
     public static void main(String[] args) throws Exception {
-        TechnicalSupportBot bot = new TechnicalSupportBot();
-        bot.startSupportSession();
-        bot.vectorDB.close();
-    }
-}
-```
-
-## Конфигурация
-
-### Оптимальные настройки для различных сценариев
-
-#### Сценарий 1: Высокая точность (техническая документация)
-```java
-KnowledgeConfig highPrecisionConfig = new KnowledgeConfig(
-    "http://localhost:11434",
-    "llama3.2",      // точная модель
-    0.85,            // высокий порог схожести
-    true,
-    true
-);
-
-SemanticChunker highPrecisionChunker = new SemanticChunker(
-    "http://localhost:11434",
-    "all-minilm:22m",
-    0.85
-);
-```
-
-#### Сценарий 2: Баланс скорости и качества (чат-бот)
-```java
-KnowledgeConfig balancedConfig = new KnowledgeConfig(
-    "http://localhost:11434", 
-    "deepseek-v3.1:671b-cloud",  // сбалансированная модель
-    0.7,                         // средний порог
-    true,
-    true
-);
-
-SemanticChunker balancedChunker = new SemanticChunker(
-    "http://localhost:11434",
-    "all-minilm:22m", 
-    0.7
-);
-```
-
-#### Сценарий 3: Максимальная скорость (реальное время)
-```java
-KnowledgeConfig speedConfig = new KnowledgeConfig(
-    "http://localhost:11434",
-    "llama3.2",      // быстрая модель
-    0.6,             // низкий порог для большего охвата
-    false,           // без сохранения истории
-    true
-);
-
-SemanticChunker speedChunker = new SemanticChunker(
-    "http://localhost:11434",
-    "all-minilm:22m",
-    0.6
-);
-```
-
-### Настройка размера чанков
-
-```java
-// Маленькие чанки (для точного поиска)
-int smallChunkSize = 200;  // символов
-
-// Средние чанки (универсальные)
-int mediumChunkSize = 500; // символов
-
-// Большие чанки (для контекстных ответов)
-int largeChunkSize = 1000; // символов
-```
-
-## Лучшие практики
-
-### 1. Оптимизация производительности
-
-```java
-// Используйте пулы соединений для HTTP клиентов
-HttpClient httpClient = HttpClient.newBuilder()
-    .connectTimeout(Duration.ofSeconds(10))
-    .executor(Executors.newFixedThreadPool(5))
-    .build();
-
-// Настройте размеры чанков в зависимости от использования
-public class OptimizedVectorDB {
-    private static final int SEARCH_CHUNK_SIZE = 300;
-    private static final int STORAGE_CHUNK_SIZE = 800;
-    
-    public void optimizeForSearch() {
-        semanticChunker.setSimilarityThreshold(0.8);
-    }
-    
-    public void optimizeForStorage() {
-        semanticChunker.setSimilarityThreshold(0.6);
-    }
-}
-```
-
-### 2. Управление памятью
-
-```java
-// Регулярная очистка кэшей
-Runtime.getRuntime().gc();
-
-// Мониторинг использования памяти
-public class MemoryMonitor {
-    public static void printMemoryUsage() {
-        Runtime runtime = Runtime.getRuntime();
-        long usedMemory = runtime.totalMemory() - runtime.freeMemory();
-        long maxMemory = runtime.maxMemory();
+        ComprehensiveKnowledgeManager knowledgeManager = new ComprehensiveKnowledgeManager();
         
-        System.out.printf("Использование памяти: %.2fMB / %.2fMB%n",
-            usedMemory / (1024.0 * 1024.0),
-            maxMemory / (1024.0 * 1024.0));
+        // Комплексная статистика
+        knowledgeManager.printComprehensiveStats();
+        
+        System.out.println("\n" + "=".repeat(60) + "\n");
+        
+        // Интерактивная сессия запросов
+        knowledgeManager.interactiveKnowledgeQuery();
+        
+        knowledgeManager.vectorDB.close();
     }
 }
 ```
 
-### 3. Обработка ошибок
+## Лучшие практики для нового функционала
+
+### 1. Оптимальное использование расширенного TreeNode
 
 ```java
-public class RobustVectorDB {
-    private VectorDatabase vectorDB;
+public class TreeNodeBestPractices {
     
-    public void safeStoreText(String text, String docId, Object[] path) {
-        try {
-            vectorDB.storeTextWithChunking(text, docId, path);
-        } catch (Exception e) {
-            System.err.println("Ошибка сохранения документа " + docId + ": " + e.getMessage());
-            // Логирование и восстановление
-            logError(e);
-            attemptRecovery(docId, path);
+    // Использование метаданных для управления версиями
+    public static void setupVersionedTree(TreeNode root) {
+        root.setMetadata("version", "1.0.0");
+        root.setMetadata("created", new Date().toString());
+        root.setMetadata("author", "System");
+        
+        // Структура данных с версионированием
+        root.setNode(new Object[]{"data", "v1", "users"}, "userListV1");
+        root.setNode(new Object[]{"data", "v2", "users"}, "userListV2");
+    }
+    
+    // Эффективный поиск в больших деревьях
+    public static void efficientTreeSearch(TreeNode root, String pattern) {
+        // Используйте findValuesByPattern для сложных поисков
+        List<Map.Entry<List<Object>, Object>> results = 
+            root.findValuesByPattern(pattern);
+        
+        // Используйте getPathToNode для точного поиска
+        List<Object> path = root.getPathToNode("specificValue");
+    }
+    
+    // Безопасные операции с деревьями
+    public static TreeNode safeTreeOperations(TreeNode original) {
+        // Всегда используйте deepCopy для модификаций
+        TreeNode workingCopy = original.deepCopy();
+        
+        // Выполняйте операции на копии
+        workingCopy.setNode(new Object[]{"new", "path"}, "newValue");
+        
+        return workingCopy;
+    }
+}
+```
+
+### 2. Управление конфигурацией SemanticChunker
+
+```java
+public class ChunkerOptimization {
+    
+    public static void optimizeForContentType(String contentType, SemanticChunker chunker) {
+        switch (contentType.toLowerCase()) {
+            case "technical":
+                chunker.setSimilarityThreshold(0.8); // Высокая точность
+                break;
+            case "legal":
+                chunker.setSimilarityThreshold(0.9); // Очень высокая точность
+                break;
+            case "creative":
+                chunker.setSimilarityThreshold(0.6); // Широкий охват
+                break;
+            default:
+                chunker.setSimilarityThreshold(0.7); // Баланс
         }
     }
     
-    public List<VectorSearchResult> safeSearch(String query, int limit) {
-        try {
-            return vectorDB.similaritySearch(query, limit);
-        } catch (Exception e) {
-            System.err.println("Ошибка поиска: " + e.getMessage());
-            return Collections.emptyList();
-        }
+    public static void monitorChunkerPerformance(SemanticChunker chunker) {
+        System.out.println("=== Chunker Performance Monitor ===");
+        System.out.println("Configuration: " + chunker.getConfigInfo());
+        System.out.println("Current threshold: " + chunker.getSimilarityThreshold());
+        System.out.println("Embedding model: " + chunker.getEmbeddingModel());
     }
 }
 ```
 
-## Устранение неполадок
-
-### Общие проблемы и решения
-
-#### Проблема 1: Ollama недоступен
-**Симптомы**:
-- `ConnectException` при создании SemanticChunker
-- Таймауты при получении эмбеддингов
-
-**Решение**:
-```bash
-# Проверка статуса Ollama
-curl http://localhost:11434/api/tags
-
-# Перезапуск Ollama
-ollama serve
-# или
-sudo systemctl restart ollama
-```
-
-#### Проблема 2: Нехватка памяти
-**Симптомы**:
-- `OutOfMemoryError`
-- Медленная работа при больших объемах данных
-
-**Решение**:
-```java
-// Увеличьте heap size
-// java -Xmx4G -jar your-app.jar
-
-// Оптимизируйте размеры чанков
-chunker.setSimilarityThreshold(0.9);  // меньше чанков
-vectorDB.saveDatabase();  // регулярное сохранение
-```
-
-#### Проблема 3: Низкая точность поиска
-**Симптомы**:
-- Нерелевантные результаты поиска
-- Высокий порог схожести, но плохие результаты
-
-**Решение**:
-```java
-// Настройте порог схожести
-chunker.setSimilarityThreshold(0.7);  // экспериментируйте
-
-// Используйте другую модель эмбеддингов
-SemanticChunker newChunker = new SemanticChunker(
-    "http://localhost:11434",
-    "nomic-embed-text",  // альтернативная модель
-    0.7
-);
-
-// Увеличьте размер чанков
-int largerChunkSize = 800;
-```
-
-#### Проблема 4: Медленная генерация ответов
-**Симптомы**:
-- Долгая обработка запросов
-- Таймауты при работе с Ollama
-
-**Решение**:
-```java
-// Используйте более быстрые модели
-client.setDefaultModel("llama3.2");  // вместо больших моделей
-
-// Уменьшите количество контекстных результатов
-client.setMaxContextResults(2);
-
-// Используйте потоковую генерацию
-Iterator<String> stream = client.generateResponseStream(query);
-```
-
-### Диагностика и отладка
-
-```java
-public class Diagnostics {
-    public static void checkSystemHealth(VectorDatabase vectorDB, 
-                                       SemanticChunker chunker) {
-        try {
-            // Проверка базы данных
-            System.out.println("Векторов в базе: " + vectorDB.getVectorCount());
-            System.out.println("Узлов в дереве: " + vectorDB.getTreeNodeCount());
-            
-            // Проверка чанкера
-            System.out.println("Конфигурация чанкера: " + chunker.getConfigInfo());
-            
-            // Проверка эмбеддингов
-            float[] testEmbedding = chunker.getEmbedding("тест");
-            System.out.println("Размерность эмбеддинга: " + testEmbedding.length);
-            
-            // Проверка поиска
-            List<VectorSearchResult> results = vectorDB.similaritySearch("тест", 1);
-            System.out.println("Поиск работает: " + !results.isEmpty());
-            
-        } catch (Exception e) {
-            System.err.println("Ошибка диагностики: " + e.getMessage());
-        }
-    }
-}
-```
-
-### Мониторинг производительности
-
-```java
-public class PerformanceMonitor {
-    private long startTime;
-    
-    public void startTiming() {
-        startTime = System.currentTimeMillis();
-    }
-    
-    public void logOperation(String operation) {
-        long duration = System.currentTimeMillis() - startTime;
-        System.out.printf("Операция '%s' заняла: %d мс%n", operation, duration);
-    }
-    
-    public static void monitorSearch(VectorDatabase vectorDB, String query) {
-        PerformanceMonitor monitor = new PerformanceMonitor();
-        monitor.startTiming();
-        
-        List<VectorSearchResult> results = vectorDB.similaritySearch(query, 5);
-        
-        monitor.logOperation("семантический поиск");
-        System.out.println("Найдено результатов: " + results.size());
-    }
-}
-```
+Эти дополнения к документации полностью охватывают новый функционал, предоставляя подробные инструкции, примеры использования и лучшие практики для работы с расширенными возможностями VectorDB.
