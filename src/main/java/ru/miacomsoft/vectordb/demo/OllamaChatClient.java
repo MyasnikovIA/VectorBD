@@ -9,7 +9,6 @@ import java.util.Scanner;
 
 /**
  * Клиент для OllamaChatDemo сервера
- * 
  * # RAGSQL Client
  * java ru.miacomsoft.vectordb.demo.RAGSQLClient
  *
@@ -18,7 +17,6 @@ import java.util.Scanner;
  *
  * # OllamaChat Client
  * java ru.miacomsoft.vectordb.demo.OllamaChatClient
- *
  */
 public class OllamaChatClient {
     private final String host;

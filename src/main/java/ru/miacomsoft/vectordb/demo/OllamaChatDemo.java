@@ -15,7 +15,7 @@ public class OllamaChatDemo {
     public static void main(String[] args) {
         // Создание конфигурации знаний
         KnowledgeConfig knowledgeConfig = new KnowledgeConfig(
-                "http://localhost:11434",
+                "http://192.168.15.6:11434",
                 "deepseek-v3.1:671b-cloud",
                 0.7,
                 true,

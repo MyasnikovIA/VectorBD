@@ -433,4 +433,176 @@ public class OllamaKnowledgeClient {
             System.out.println("📊 " + entry.getKey() + ": " + entry.getValue());
         }
     }
+    /**
+     * Генерация ответа с использованием предоставленного контекста
+     * @param queryWithContext запрос с уже подготовленным контекстом
+     * @return сгенерированный ответ
+     */
+    public String generateResponseWithContext(String queryWithContext) {
+        try {
+            // Формируем промпт для модели с явным указанием использовать контекст
+            String prompt = String.format("""
+            Ты - AI ассистент. Используй предоставленный контекст для точного ответа на вопрос.
+            
+            %s
+            
+            Инструкции:
+            - Ответь максимально точно на основе предоставленного контекста
+            - Если в контексте нет нужной информации, явно укажи это
+            - Будь конкретен и информативен
+            - Сохраняй профессиональный тон
+            - Если информация в контексте противоречива, укажи на это
+            
+            Ответ:
+            """, queryWithContext);
+
+            // Генерация ответа через Ollama
+            Iterator<String> responseStream = ollamaClient.generateResponseStream(
+                    defaultModel, prompt, false);
+
+            StringBuilder response = new StringBuilder();
+            while (responseStream.hasNext()) {
+                String token = responseStream.next();
+                if (token != null && !token.trim().isEmpty()) {
+                    response.append(token);
+                }
+            }
+
+            return response.toString();
+
+        } catch (Exception e) {
+            System.err.println("Error generating response with context: " + e.getMessage());
+            return "Извините, произошла ошибка при генерации ответа с использованием контекста: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Генерация ответа с контекстом и потоковой передачей
+     * @param queryWithContext запрос с контекстом
+     * @return итератор для потокового чтения ответа
+     */
+    public Iterator<String> generateResponseWithContextStream(String queryWithContext) {
+        try {
+            String prompt = String.format("""
+            Ты - AI ассистент. Используй предоставленный контекст для точного ответа.
+            Будь точным и информативным, основывай ответ на контексте.
+            
+            %s
+            
+            Ответ:
+            """, queryWithContext);
+
+            return ollamaClient.generateResponseStream(defaultModel, prompt, true);
+
+        } catch (Exception e) {
+            System.err.println("Error generating stream response with context: " + e.getMessage());
+            List<String> errorMessage = List.of("Извините, произошла ошибка: " + e.getMessage());
+            return errorMessage.iterator();
+        }
+    }
+
+    /**
+     * Генерация ответа с автоматическим поиском контекста из базы знаний
+     * @param query пользовательский запрос
+     * @param context дополнительный контекст (может быть null)
+     * @return сгенерированный ответ
+     */
+    public String generateResponseWithContext(String query, String context) {
+        try {
+            StringBuilder fullContext = new StringBuilder();
+
+            // Добавляем контекст из базы знаний, если запрос не пустой
+            if (query != null && !query.trim().isEmpty()) {
+                List<String> relevantFacts = findRelevantFacts(query, maxContextResults);
+                if (!relevantFacts.isEmpty()) {
+                    fullContext.append("Релевантная информация из базы знаний:\n");
+                    for (int i = 0; i < relevantFacts.size(); i++) {
+                        fullContext.append(i + 1).append(". ").append(relevantFacts.get(i)).append("\n");
+                    }
+                    fullContext.append("\n");
+                }
+            }
+
+            // Добавляем предоставленный контекст
+            if (context != null && !context.trim().isEmpty()) {
+                fullContext.append("Дополнительный контекст:\n").append(context).append("\n\n");
+            }
+
+            // Формируем финальный промпт
+            String enhancedQuery;
+            if (fullContext.length() > 0) {
+                enhancedQuery = fullContext.toString() + "Вопрос: " + query;
+            } else {
+                enhancedQuery = "Вопрос: " + query;
+            }
+
+            return generateResponseWithContext(enhancedQuery);
+
+        } catch (Exception e) {
+            System.err.println("Error in generateResponseWithContext: " + e.getMessage());
+            return generateResponse(query); // Fallback to simple response
+        }
+    }
+
+    /**
+     * Расширенная версия с детальной статистикой
+     */
+    public Map<String, Object> generateResponseWithContextDetailed(String query, String context) {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            long startTime = System.currentTimeMillis();
+
+            // Поиск релевантных фактов
+            List<VectorSearchResult> searchResults = database.similaritySearch(query, maxContextResults);
+            List<String> contextFacts = new ArrayList<>();
+            List<Double> similarities = new ArrayList<>();
+
+            for (VectorSearchResult resultItem : searchResults) {
+                if (resultItem.getSimilarity() >= similarityThreshold) {
+                    contextFacts.add(resultItem.getVectorData().getText());
+                    similarities.add(resultItem.getSimilarity());
+                }
+            }
+
+            // Формирование полного контекста
+            StringBuilder fullContext = new StringBuilder();
+
+            if (!contextFacts.isEmpty()) {
+                fullContext.append("Контекст из бинарной базы знаний:\n");
+                for (int i = 0; i < contextFacts.size(); i++) {
+                    fullContext.append("[Документ ").append(i + 1)
+                            .append(", схожесть: ").append(String.format("%.3f", similarities.get(i)))
+                            .append("]\n")
+                            .append(contextFacts.get(i)).append("\n\n");
+                }
+            }
+
+            if (context != null && !context.trim().isEmpty()) {
+                fullContext.append("Дополнительный контекст:\n").append(context).append("\n\n");
+            }
+
+            // Генерация ответа
+            String enhancedQuery = fullContext.toString() + "Вопрос: " + query;
+            String response = generateResponseWithContext(enhancedQuery);
+
+            long endTime = System.currentTimeMillis();
+
+            // Формирование результата
+            result.put("response", response);
+            result.put("contextFacts", contextFacts);
+            result.put("similarities", similarities);
+            result.put("providedContext", context);
+            result.put("processingTimeMs", endTime - startTime);
+            result.put("databaseResultsUsed", contextFacts.size());
+            result.put("databaseType", "binary");
+
+        } catch (Exception e) {
+            result.put("error", "Ошибка при генерации ответа: " + e.getMessage());
+            result.put("response", generateResponse(query)); // Fallback
+        }
+
+        return result;
+    }
+
 }

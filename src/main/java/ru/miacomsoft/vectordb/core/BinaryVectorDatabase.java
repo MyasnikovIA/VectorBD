@@ -345,4 +345,77 @@ public class BinaryVectorDatabase {
         results.sort((a, b) -> Long.compare(b.getTimestamp(), a.getTimestamp()));
         return results;
     }
+    /**
+     * Поиск похожих текстов с возвратом результатов в формате Map
+     */
+    public List<Map<String, Object>> searchSimilarText(String query, int limit) {
+        try {
+            List<Map<String, Object>> results = new ArrayList<>();
+
+            // Используем существующий метод similaritySearch
+            List<VectorSearchResult> searchResults = similaritySearch(query, limit);
+
+            for (VectorSearchResult result : searchResults) {
+                BinaryVectorData vectorData = result.getVectorData();
+                Map<String, Object> resultMap = new HashMap<>();
+
+                resultMap.put("id", vectorData.getId());
+                resultMap.put("content", vectorData.getText());
+                resultMap.put("metadata", vectorData.getMetadata());
+                resultMap.put("similarity", result.getSimilarity());
+                resultMap.put("distance", result.getDistance());
+                resultMap.put("documentId", vectorData.getDocumentId());
+                resultMap.put("chunkIndex", vectorData.getChunkIndex());
+                resultMap.put("nodePath", vectorData.getNodePath());
+
+                results.add(resultMap);
+            }
+
+            return results;
+
+        } catch (Exception e) {
+            System.err.println("Error in searchSimilarText: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Перегруженная версия с порогом схожести
+     */
+    public List<Map<String, Object>> searchSimilarText(String query, int limit, double similarityThreshold) {
+        try {
+            List<Map<String, Object>> results = new ArrayList<>();
+
+            List<VectorSearchResult> searchResults = similaritySearch(query, limit * 2); // Ищем больше, чтобы отфильтровать
+
+            for (VectorSearchResult result : searchResults) {
+                if (result.getSimilarity() >= similarityThreshold) {
+                    BinaryVectorData vectorData = result.getVectorData();
+                    Map<String, Object> resultMap = new HashMap<>();
+
+                    resultMap.put("id", vectorData.getId());
+                    resultMap.put("content", vectorData.getText());
+                    resultMap.put("metadata", vectorData.getMetadata());
+                    resultMap.put("similarity", result.getSimilarity());
+                    resultMap.put("distance", result.getDistance());
+                    resultMap.put("documentId", vectorData.getDocumentId());
+                    resultMap.put("chunkIndex", vectorData.getChunkIndex());
+                    resultMap.put("nodePath", vectorData.getNodePath());
+
+                    results.add(resultMap);
+
+                    // Останавливаемся когда достигли лимита
+                    if (results.size() >= limit) {
+                        break;
+                    }
+                }
+            }
+
+            return results;
+
+        } catch (Exception e) {
+            System.err.println("Error in searchSimilarText: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
 }
