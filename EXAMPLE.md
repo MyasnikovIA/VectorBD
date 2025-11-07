@@ -8,6 +8,7 @@
 5. [Продвинутые сценарии](#продвинутые-сценарии)
 6. [Интеграционные примеры](#интеграционные-примеры)
 7. [Утилиты и инструменты](#утилиты-и-инструменты)
+8. [Новый функционал](#новый-функционал)
 
 ## Быстрый старт
 
@@ -27,7 +28,7 @@ public class QuickStartExample {
                 0.8
             );
             
-            VectorDatabase vectorDB = new VectorDatabase("./data/quickstart", chunker);
+            BinaryVectorDatabase vectorDB = new BinaryVectorDatabase("./data/quickstart", chunker);
             
             // 2. Загрузка данных
             String document = """
@@ -92,15 +93,19 @@ public class EnvironmentSetup {
 
 ## Базовые операции
 
-### Работа с VectorDatabase
+### Работа с BinaryVectorDatabase
 
 ```java
-public class VectorDBOperations {
+public class BinaryVectorDBOperations {
     public static void main(String[] args) throws Exception {
         SemanticChunker chunker = new SemanticChunker(
             "http://localhost:11434", "all-minilm:22m", 0.8
         );
-        VectorDatabase vectorDB = new VectorDatabase("./data/operations", chunker);
+        
+        // Создание базы с 1 GB памяти
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase(
+            "./data/operations", chunker, 1024 * 1024 * 1024
+        );
         
         // Сохранение различных типов данных
         String[] documents = {
@@ -128,13 +133,13 @@ public class VectorDBOperations {
         );
         
         System.out.println("\n=== Точный поиск ===");
-        List<VectorData> exactResults = vectorDB.exactSearch("Java");
+        List<BinaryVectorData> exactResults = vectorDB.exactSearch("Java");
         exactResults.forEach(data -> 
             System.out.println("Найдено: " + data.getText())
         );
         
         System.out.println("\n=== Поиск по пути ===");
-        List<VectorData> pathResults = vectorDB.searchByPath("lang");
+        List<BinaryVectorData> pathResults = vectorDB.searchByPath("lang");
         pathResults.forEach(data -> 
             System.out.println("Путь: " + data.getNodePath() + " - " + data.getText())
         );
@@ -144,60 +149,107 @@ public class VectorDBOperations {
         System.out.println("Векторов: " + vectorDB.getVectorCount());
         System.out.println("Узлов: " + vectorDB.getTreeNodeCount());
         
+        // Статистика памяти
+        Map<String, Object> memoryStats = vectorDB.getMemoryStats();
+        System.out.println("Использование памяти: " + memoryStats.get("estimatedUsageMB") + " MB");
+        
         vectorDB.close();
     }
 }
 ```
 
-### Работа с TreeNode
+### Работа с BinaryTreeNode
 
 ```java
-public class TreeNodeExamples {
+public class BinaryTreeNodeExamples {
     public static void main(String[] args) {
-        TreeNode root = new TreeNode();
+        BinaryTreeNode root = new BinaryTreeNode("root");
+        BinaryTreeNode left = new BinaryTreeNode("left child");
+        BinaryTreeNode right = new BinaryTreeNode("right child");
         
-        // Базовые операции
-        root.setNode(new Object[]{"users", "alice", "name"}, "Alice Johnson");
-        root.setNode(new Object[]{"users", "alice", "age"}, 28);
-        root.setNode(new Object[]{"users", "alice", "email"}, "alice@example.com");
+        // Построение дерева
+        root.setLeft(left);
+        root.setRight(right);
         
-        root.setNode(new Object[]{"users", "bob", "name"}, "Bob Smith");
-        root.setNode(new Object[]{"users", "bob", "age"}, 32);
+        // Установка метаданных
+        root.setMetadata("author", "System");
+        root.setMetadata("version", "1.0");
+        left.setMetadata("type", "branch");
+        right.setMetadata("type", "branch");
         
-        root.setNode(new Object[]{"config", "database", "url"}, "jdbc:postgresql://localhost/test");
-        root.setNode(new Object[]{"config", "database", "username"}, "admin");
+        // Сериализация дерева
+        try {
+            byte[] serializedData = root.serialize();
+            System.out.println("Дерево сериализовано, размер: " + serializedData.length + " bytes");
+            
+            // Десериализация
+            BinaryTreeNode restoredRoot = BinaryTreeNode.deserialize(serializedData);
+            System.out.println("Дерево восстановлено: " + restoredRoot.getContent());
+            System.out.println("Метаданные: " + restoredRoot.getMetadata());
+            
+        } catch (IOException e) {
+            System.err.println("Ошибка сериализации: " + e.getMessage());
+        }
         
-        // Получение данных
-        String name = (String) root.getNode(new Object[]{"users", "alice", "name"});
-        Integer age = (Integer) root.getNode(new Object[]{"users", "alice", "age"});
-        System.out.println("Пользователь: " + name + ", возраст: " + age);
+        // Работа с бинарной структурой
+        System.out.println("\n=== Обход дерева ===");
+        traverseTree(root, 0);
+    }
+    
+    private static void traverseTree(BinaryTreeNode node, int level) {
+        if (node == null) return;
         
-        // Поиск
-        System.out.println("\n=== Поиск пользователей ===");
-        List<TreeNode.QueryResult> users = root.query(new Object[]{"users"}, 2);
-        users.forEach(result -> 
-            System.out.println("Путь: " + result.getPathString() + " = " + result.getValue())
+        String indent = "  ".repeat(level);
+        System.out.println(indent + "└── " + node.getContent());
+        
+        if (node.getLeft() != null) {
+            System.out.println(indent + "    ├── LEFT: " + node.getLeft().getContent());
+            traverseTree(node.getLeft(), level + 2);
+        }
+        
+        if (node.getRight() != null) {
+            System.out.println(indent + "    └── RIGHT: " + node.getRight().getContent());
+            traverseTree(node.getRight(), level + 2);
+        }
+    }
+}
+```
+
+### Работа с BinaryVectorData
+
+```java
+public class BinaryVectorDataExamples {
+    public static void main(String[] args) throws IOException {
+        // Создание векторных данных
+        float[] embedding = new float[384]; // пример эмбеддинга
+        Arrays.fill(embedding, 0.1f); // заполнение тестовыми значениями
+        
+        BinaryVectorData vectorData = new BinaryVectorData(
+            "doc_chunk_0",
+            embedding,
+            "Текст чанка документа о машинном обучении",
+            "{\"category\": \"ai\", \"source\": \"internal\"}",
+            "[documents, ai]",
+            "ai_document",
+            0
         );
         
-        // Метаданные
-        root.setMetadata("created", "2024-01-01");
-        root.setMetadata("version", "1.0");
+        // Сериализация
+        byte[] serialized = vectorData.serialize();
+        System.out.println("Данные сериализованы, размер: " + serialized.length + " bytes");
         
-        // JSON сериализация
-        String json = root.toJsonString();
-        System.out.println("\n=== JSON представление ===");
-        System.out.println(json);
+        // Десериализация
+        BinaryVectorData restored = BinaryVectorData.deserialize(serialized);
+        System.out.println("Данные восстановлены:");
+        System.out.println("ID: " + restored.getId());
+        System.out.println("Текст: " + restored.getText());
+        System.out.println("Chunk Index: " + restored.getChunkIndex());
+        System.out.println("Размерность вектора: " + restored.getVector().length);
         
-        // Визуализация дерева
-        System.out.println("\n=== Структура дерева ===");
-        System.out.println(root.toTreeString());
-        
-        // Статистика
-        System.out.println("\n=== Статистика ===");
-        System.out.println("Всего узлов: " + root.countNodes());
-        System.out.println("Глубина: " + root.getDepth());
-        System.out.println("Ширина: " + root.getWidth());
-        System.out.println("Листовые значения: " + root.getLeafValues());
+        // Автоматическое извлечение chunkIndex из ID
+        BinaryVectorData autoChunkData = new BinaryVectorData();
+        autoChunkData.setId("document_chunk_5");
+        System.out.println("Автоопределенный chunkIndex: " + autoChunkData.getChunkIndex());
     }
 }
 ```
@@ -267,7 +319,11 @@ public class SearchStrategies {
         SemanticChunker chunker = new SemanticChunker(
             "http://localhost:11434", "all-minilm:22m", 0.7
         );
-        VectorDatabase vectorDB = new VectorDatabase("./data/search_demo", chunker);
+        
+        // Создание базы с управлением памятью
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase(
+            "./data/search_demo", chunker, 512 * 1024 * 1024 // 512 MB
+        );
         
         // Загрузка тестовых данных
         String[] techTopics = {
@@ -312,6 +368,12 @@ public class SearchStrategies {
             }
         }
         
+        // Статистика памяти после поиска
+        Map<String, Object> memoryStats = vectorDB.getMemoryStats();
+        System.out.println("\n=== Статистика памяти ===");
+        System.out.println("Использовано: " + memoryStats.get("estimatedUsageMB") + " MB");
+        System.out.println("Лимит: " + memoryStats.get("maxMemoryMB") + " MB");
+        
         vectorDB.close();
     }
 }
@@ -331,7 +393,10 @@ public class KnowledgeLoaderExamples {
         SemanticChunker chunker = new SemanticChunker(
             "http://localhost:11434", "all-minilm:22m", 0.8
         );
-        VectorDatabase vectorDB = new VectorDatabase("./data/knowledge_demo", chunker);
+        
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase(
+            "./data/knowledge_demo", chunker, 1024 * 1024 * 1024 // 1 GB
+        );
         
         KnowledgeLoader loader = new KnowledgeLoader(vectorDB, config);
         
@@ -350,14 +415,6 @@ public class KnowledgeLoaderExamples {
             300,
             "educational"
         );
-        
-        // Загрузка из файла (пример)
-        // int chunks2 = loader.loadTextFile(
-        //     "path/to/document.txt",
-        //     "file_doc",
-        //     new Object[]{"docs", "external"},
-        //     500
-        // );
         
         // Динамическая настройка порога
         System.out.println("Текущий порог: " + loader.getCurrentSimilarityThreshold());
@@ -390,7 +447,10 @@ public class RAGExamples {
         SemanticChunker chunker = new SemanticChunker(
             "http://localhost:11434", "all-minilm:22m", 0.7
         );
-        VectorDatabase vectorDB = new VectorDatabase("./data/rag_demo", chunker);
+        
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase(
+            "./data/rag_demo", chunker, 512 * 1024 * 1024 // 512 MB
+        );
         
         // Загрузка знаний
         KnowledgeLoader loader = new KnowledgeLoader(vectorDB, config);
@@ -446,7 +506,10 @@ public class InteractiveChatExample {
         SemanticChunker chunker = new SemanticChunker(
             "http://localhost:11434", "all-minilm:22m", 0.7
         );
-        VectorDatabase vectorDB = new VectorDatabase("./data/chat_demo", chunker);
+        
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase(
+            "./data/chat_demo", chunker, 1024 * 1024 * 1024 // 1 GB
+        );
         
         // Загрузка знаний для чата
         KnowledgeLoader loader = new KnowledgeLoader(vectorDB, config);
@@ -487,7 +550,10 @@ public class PromptGeneratorExamples {
         SemanticChunker chunker = new SemanticChunker(
             "http://localhost:11434", "all-minilm:22m", 0.7
         );
-        VectorDatabase vectorDB = new VectorDatabase("./data/prompt_demo", chunker);
+        
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase(
+            "./data/prompt_demo", chunker, 512 * 1024 * 1024 // 512 MB
+        );
         
         // Загрузка данных для промптов
         KnowledgeLoader loader = new KnowledgeLoader(vectorDB, config);
@@ -527,120 +593,368 @@ public class PromptGeneratorExamples {
 }
 ```
 
-### Расширенная работа с деревьями
+## Новый функционал
+
+### Управление памятью в BinaryVectorDatabase
 
 ```java
-public class AdvancedTreeNodeExamples {
-    public static void main(String[] args) {
-        TreeNode company = new TreeNode();
-        
-        // Создание сложной структуры
-        company.setNode(new Object[]{"departments", "engineering", "team", "frontend", "members", "alice"}, 
-            "Alice Johnson - Senior Frontend Developer");
-        company.setNode(new Object[]{"departments", "engineering", "team", "frontend", "members", "bob"}, 
-            "Bob Smith - Frontend Developer");
-        company.setNode(new Object[]{"departments", "engineering", "team", "backend", "members", "charlie"}, 
-            "Charlie Brown - Backend Team Lead");
-        
-        company.setNode(new Object[]{"departments", "sales", "region", "europe", "manager"}, 
-            "Diana Prince - Europe Sales Manager");
-        company.setNode(new Object[]{"departments", "sales", "region", "asia", "manager"}, 
-            "Eve Wilson - Asia Sales Manager");
-        
-        // Метаданные
-        company.setMetadata("companyName", "TechInnovations Inc.");
-        company.setMetadata("founded", "2015");
-        company.setMetadata("employees", 150);
-        
-        // Расширенный поиск
-        System.out.println("=== Поиск менеджеров ===");
-        List<Map.Entry<List<Object>, Object>> managers = 
-            company.findValuesByPattern("Manager");
-        managers.forEach(entry -> 
-            System.out.println("Путь: " + entry.getKey() + " -> " + entry.getValue())
+public class MemoryManagementExample {
+    public static void main(String[] args) throws Exception {
+        SemanticChunker chunker = new SemanticChunker(
+            "http://localhost:11434", "all-minilm:22m", 0.7
         );
         
-        // Поиск путей
-        System.out.println("\n=== Путь к Alice ===");
-        List<Object> pathToAlice = company.getPathToNode("Alice Johnson - Senior Frontend Developer");
-        System.out.println("Путь: " + pathToAlice);
+        // Создание базы с ограничением памяти
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase(
+            "./data/memory_managed", chunker, 500 * 1024 * 1024 // 500 MB
+        );
         
-        // Статистика организации
-        System.out.println("\n=== Статистика компании ===");
-        System.out.println("Всего узлов в структуре: " + company.countNodes());
-        System.out.println("Глубина структуры: " + company.getDepth());
-        System.out.println("Ширина структуры: " + company.getWidth());
+        KnowledgeLoader loader = new KnowledgeLoader(vectorDB, 
+            new KnowledgeConfig("http://localhost:11434", "deepseek-v3.1:671b-cloud", 0.7, true, true));
         
-        // Визуализация
-        System.out.println("\n=== Организационная структура ===");
-        System.out.println(company.toTreeString());
+        // Загрузка данных с мониторингом памяти
+        loadDataWithMemoryMonitoring(loader, vectorDB);
         
-        // JSON экспорт
-        System.out.println("\n=== JSON экспорт ===");
-        String json = company.toJsonString();
-        System.out.println(json.substring(0, Math.min(500, json.length())) + "...");
+        // Проверка использования памяти
+        Map<String, Object> memoryStats = vectorDB.getMemoryStats();
+        System.out.println("=== Memory Statistics ===");
+        memoryStats.forEach((key, value) -> System.out.println(key + ": " + value));
         
-        // Создание из JSON
-        TreeNode importedCompany = TreeNode.fromJsonString(json);
-        System.out.println("\nИмпортировано узлов: " + importedCompany.countNodes());
+        vectorDB.close();
+    }
+    
+    private static void loadDataWithMemoryMonitoring(KnowledgeLoader loader, BinaryVectorDatabase vectorDB) throws Exception {
+        // Загрузка данных порциями с проверкой памяти
+        String[] documents = {
+            "Документ о машинном обучении и искусственном интеллекте...",
+            "Документ о базах данных и системах хранения информации...",
+            "Документ о веб-разработке и современных фреймворках...",
+            "Документ о мобильной разработке и платформах...",
+            "Документ о DevOps и практиках непрерывной интеграции...",
+            // ... больше документов
+        };
+        
+        for (int i = 0; i < documents.length; i++) {
+            loader.loadText(documents[i], "doc_" + i,
+                new Object[]{"documents", "batch1"}, 500, "document_" + i);
+            
+            // Проверка памяти каждые 2 документа
+            if (i % 2 == 0) {
+                Map<String, Object> stats = vectorDB.getMemoryStats();
+                long usedMB = (Long) stats.get("estimatedUsageMB");
+                long maxMB = (Long) stats.get("maxMemoryMB");
+                System.out.printf("Loaded %d documents, memory: %d/%d MB (%.1f%%)%n",
+                    i + 1, usedMB, maxMB, (usedMB * 100.0 / maxMB));
+                
+                if (usedMB > maxMB * 0.8) {
+                    System.out.println("Memory usage high, optimizing...");
+                    loader.optimizeKnowledgeBase();
+                }
+            }
+        }
     }
 }
 ```
 
-### Управление конфигурацией
+### Работа с индексами
 
 ```java
-public class ConfigurationManagement {
-    public static void main(String[] args) {
-        // Различные конфигурации для разных сценариев
-        
-        // Высокая точность
-        KnowledgeConfig highPrecisionConfig = new KnowledgeConfig(
-            "http://localhost:11434", "llama3.2", 0.9, true, true
+public class IndexManagementExample {
+    public static void main(String[] args) throws Exception {
+        SemanticChunker chunker = new SemanticChunker(
+            "http://localhost:11434", "all-minilm:22m", 0.7
         );
         
-        // Баланс скорости и качества
-        KnowledgeConfig balancedConfig = new KnowledgeConfig(
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase(
+            "./data/index_demo", chunker, 1024 * 1024 * 1024 // 1 GB
+        );
+        
+        // Загрузка тестовых данных
+        KnowledgeLoader loader = new KnowledgeLoader(vectorDB,
+            new KnowledgeConfig("http://localhost:11434", "llama3.2", 0.7, true, true));
+        
+        String[] documents = {
+            "Java programming language for enterprise applications",
+            "Python for data science and machine learning projects", 
+            "JavaScript for web development and frontend applications",
+            "Go language for concurrent programming and microservices",
+            "Rust for systems programming and memory safety"
+        };
+        
+        for (int i = 0; i < documents.length; i++) {
+            loader.loadText(documents[i], "lang_doc_" + i,
+                new Object[]{"languages", "doc_" + i}, 400, "programming");
+        }
+        
+        // Создание индексов
+        System.out.println("=== Создание индексов ===");
+        vectorDB.createIndex("content_index", "content");
+        vectorDB.createIndex("language_index", "metadata.category");
+        vectorDB.createIndex("document_index", "metadata.documentId");
+        
+        // Информация об индексах
+        Map<String, Object> indexesInfo = vectorDB.getIndexesInfo();
+        System.out.println("\n=== Информация об индексах ===");
+        indexesInfo.forEach((indexName, info) -> {
+            Map<String, Object> indexInfo = (Map<String, Object>) info;
+            System.out.printf("%s: %d записей, %d KB памяти%n",
+                indexName, indexInfo.get("size"), indexInfo.get("estimatedMemoryKB"));
+        });
+        
+        // Поиск по индексу
+        System.out.println("\n=== Поиск по индексу ===");
+        List<String> searchResults = vectorDB.searchByIndex("content_index", "programming");
+        System.out.println("Найдено документов: " + searchResults.size());
+        searchResults.forEach(id -> System.out.println("  - " + id));
+        
+        // Удаление индекса
+        System.out.println("\n=== Удаление индекса ===");
+        vectorDB.dropIndex("document_index");
+        
+        // Обновленная информация об индексах
+        Map<String, Object> updatedIndexesInfo = vectorDB.getIndexesInfo();
+        System.out.println("Оставшиеся индексы: " + updatedIndexesInfo.keySet());
+        
+        vectorDB.close();
+    }
+}
+```
+
+### JSON интеграция с BinaryVectorDBJsonManager
+
+```java
+public class JsonIntegrationExample {
+    public static void main(String[] args) throws Exception {
+        SemanticChunker chunker = new SemanticChunker(
+            "http://localhost:11434", "all-minilm:22m", 0.7
+        );
+        
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase(
+            "./data/json_demo", chunker, 512 * 1024 * 1024 // 512 MB
+        );
+        
+        BinaryVectorDBJsonManager jsonManager = new BinaryVectorDBJsonManager(vectorDB);
+        
+        // Загрузка тестовых данных
+        KnowledgeLoader loader = new KnowledgeLoader(vectorDB,
+            new KnowledgeConfig("http://localhost:11434", "llama3.2", 0.7, true, true));
+        
+        String data = """
+            Искусственный интеллект преобразует современные технологии.
+            Машинное обучение позволяет компьютерам обучаться на данных.
+            Глубокое обучение использует нейронные сети для сложных задач.
+            """;
+            
+        loader.loadText(data, "ai_data",
+            new Object[]{"ai", "knowledge"}, 300, "educational");
+        
+        // Экспорт в JSON
+        System.out.println("=== Экспорт данных в JSON ===");
+        JSONArray allVectors = jsonManager.exportAllVectorDataToJson();
+        System.out.println("Экспортировано векторов: " + allVectors.length());
+        
+        JSONArray allNodes = jsonManager.exportAllTreeNodesToJson();
+        System.out.println("Экспортировано узлов: " + allNodes.length());
+        
+        // Экспорт статистики
+        JSONObject stats = jsonManager.exportDatabaseStatsToJson();
+        System.out.println("\n=== Статистика базы ===");
+        System.out.println(stats.toString(2));
+        
+        // Поиск и экспорт
+        System.out.println("\n=== Поиск и экспорт ===");
+        JSONArray searchResults = jsonManager.searchAndExportToJson("искусственный интеллект", 3);
+        System.out.println("Результатов поиска: " + searchResults.length());
+        
+        // Сохранение в файлы
+        System.out.println("\n=== Сохранение в файлы ===");
+        jsonManager.saveDatabaseToJsonFiles("./json_export");
+        System.out.println("Данные сохранены в папку ./json_export");
+        
+        // Работа с отдельными объектами
+        System.out.println("\n=== Работа с отдельными объектами ===");
+        List<BinaryVectorData> allData = vectorDB.findAllVectorData();
+        if (!allData.isEmpty()) {
+            BinaryVectorData sampleData = allData.get(0);
+            
+            // Конвертация в JSON строку
+            String jsonString = jsonManager.vectorDataToJsonString(sampleData);
+            System.out.println("JSON строка (первые 200 символов): " + 
+                jsonString.substring(0, Math.min(200, jsonString.length())) + "...");
+            
+            // Восстановление из JSON строки
+            BinaryVectorData restoredData = jsonManager.vectorDataFromJsonString(jsonString);
+            System.out.println("Данные восстановлены: " + restoredData.getId());
+        }
+        
+        // Пакетный экспорт
+        System.out.println("\n=== Пакетный экспорт ===");
+        jsonManager.batchExportToJsonFile("./full_export.json");
+        System.out.println("Пакетный экспорт завершен");
+        
+        vectorDB.close();
+    }
+}
+```
+
+### SQL-подобный интерфейс
+
+```java
+public class SQLInterfaceExample {
+    public static void main(String[] args) throws Exception {
+        SemanticChunker chunker = new SemanticChunker(
+            "http://localhost:11434", "all-minilm:22m", 0.7
+        );
+        
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase(
+            "./data/sql_demo", chunker, 512 * 1024 * 1024 // 512 MB
+        );
+        
+        SQLParser sqlParser = new SQLParser(vectorDB);
+        
+        // Загрузка тестовых данных
+        KnowledgeLoader loader = new KnowledgeLoader(vectorDB,
+            new KnowledgeConfig("http://localhost:11434", "llama3.2", 0.7, true, true));
+        
+        String[] documents = {
+            "Java programming for enterprise applications",
+            "Python for data science and AI",
+            "JavaScript for web development",
+            "Database management with SQL"
+        };
+        
+        for (int i = 0; i < documents.length; i++) {
+            loader.loadText(documents[i], "doc_" + i,
+                new Object[]{"technology", "lang_" + i}, 300, "tech");
+        }
+        
+        // Выполнение SQL-подобных запросов
+        System.out.println("=== SQL-подобные запросы ===");
+        
+        // SELECT запрос
+        System.out.println("\n--- SELECT запрос ---");
+        List<JSONObject> selectResults = sqlParser.execute(
+            "SELECT * FROM documents WHERE text LIKE '%programming%' LIMIT 2"
+        );
+        System.out.println("Найдено записей: " + selectResults.size());
+        selectResults.forEach(json -> System.out.println("  - " + json.toString()));
+        
+        // Семантический поиск через SQL интерфейс
+        System.out.println("\n--- Семантический поиск ---");
+        List<JSONObject> semanticResults = sqlParser.semanticSearch("data science", 3);
+        System.out.println("Семантических результатов: " + semanticResults.size());
+        
+        // Гибридный поиск
+        System.out.println("\n--- Гибридный поиск ---");
+        List<JSONObject> hybridResults = sqlParser.hybridSearch("web development programming", 5);
+        System.out.println("Гибридных результатов: " + hybridResults.size());
+        
+        vectorDB.close();
+    }
+}
+```
+
+### Комплексный пример с новым функционалом
+
+```java
+public class ComprehensiveExample {
+    public static void main(String[] args) throws Exception {
+        // Инициализация с расширенными настройками
+        KnowledgeConfig config = new KnowledgeConfig(
             "http://localhost:11434", "deepseek-v3.1:671b-cloud", 0.7, true, true
         );
         
-        // Максимальная скорость
-        KnowledgeConfig speedConfig = new KnowledgeConfig(
-            "http://localhost:11434", "llama3.2", 0.6, false, true
+        SemanticChunker chunker = new SemanticChunker(
+            "http://localhost:11434", "all-minilm:22m", 0.7
         );
         
-        // Проверка валидности конфигураций
-        System.out.println("=== Проверка конфигураций ===");
-        System.out.println("High precision config valid: " + highPrecisionConfig.isValid());
-        System.out.println("Balanced config valid: " + balancedConfig.isValid());
-        System.out.println("Speed config valid: " + speedConfig.isValid());
+        // Создание базы с 2 GB памяти
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase(
+            "./data/comprehensive", chunker, 2L * 1024 * 1024 * 1024
+        );
         
-        // Использование разных конфигураций
-        System.out.println("\n=== Конфигурации для разных сценариев ===");
+        KnowledgeLoader loader = new KnowledgeLoader(vectorDB, config);
+        OllamaKnowledgeClient client = new OllamaKnowledgeClient(vectorDB, config);
+        BinaryVectorDBJsonManager jsonManager = new BinaryVectorDBJsonManager(vectorDB);
         
-        System.out.println("Техническая документация:");
-        highPrecisionConfig.printConfig();
+        // Загрузка разнообразных данных
+        System.out.println("=== Загрузка данных ===");
+        Map<String, String> documents = new HashMap<>();
+        documents.put("ai_basics", "Искусственный интеллект и машинное обучение...");
+        documents.put("web_dev", "Веб-разработка с современными фреймворками...");
+        documents.put("databases", "Реляционные и NoSQL базы данных...");
+        documents.put("cloud", "Облачные вычисления и микросервисы...");
         
-        System.out.println("\nЧат-бот поддержки:");
-        balancedConfig.printConfig();
+        Map<String, Integer> loadResults = loader.loadTextBatch(documents, "tech_docs",
+            new Object[]{"technology"}, 500);
         
-        System.out.println("\nРеальное время:");
-        speedConfig.printConfig();
+        System.out.println("Загружено документов:");
+        loadResults.forEach((name, chunks) -> 
+            System.out.println("  " + name + ": " + chunks + " чанков")
+        );
+        
+        // Создание индексов для оптимизации
+        System.out.println("\n=== Создание индексов ===");
+        vectorDB.createIndex("content_index", "content");
+        vectorDB.createIndex("tech_index", "metadata.category");
+        
+        // Мониторинг памяти
+        System.out.println("\n=== Мониторинг памяти ===");
+        Map<String, Object> memoryStats = vectorDB.getMemoryStats();
+        memoryStats.forEach((key, value) -> System.out.println(key + ": " + value));
+        
+        // Информация об индексах
+        System.out.println("\n=== Информация об индексах ===");
+        Map<String, Object> indexesInfo = vectorDB.getIndexesInfo();
+        indexesInfo.forEach((name, info) -> 
+            System.out.println(name + ": " + info)
+        );
+        
+        // Экспорт в JSON
+        System.out.println("\n=== Экспорт в JSON ===");
+        jsonManager.saveDatabaseToJsonFiles("./comprehensive_export");
+        System.out.println("Данные экспортированы в JSON");
+        
+        // Демонстрация поиска
+        System.out.println("\n=== Демонстрация поиска ===");
+        String[] testQueries = {"искусственный интеллект", "базы данных", "веб-разработка"};
+        
+        for (String query : testQueries) {
+            System.out.println("\nЗапрос: " + query);
+            
+            // Поиск по индексу
+            List<String> indexResults = vectorDB.searchByIndex("content_index", query);
+            System.out.println("Результаты по индексу: " + indexResults.size());
+            
+            // Семантический поиск
+            List<VectorSearchResult> semanticResults = vectorDB.similaritySearch(query, 2);
+            System.out.println("Семантические результаты: " + semanticResults.size());
+            
+            // Генерация ответа с использованием знаний
+            String answer = client.generateResponseWithKnowledge(query);
+            System.out.println("Ответ ИИ: " + answer.substring(0, Math.min(100, answer.length())) + "...");
+        }
+        
+        // Грациозное завершение
+        System.out.println("\n=== Завершение работы ===");
+        vectorDB.close();
+        System.out.println("База данных закрыта, все данные сохранены");
     }
 }
 ```
 
 ## Интеграционные примеры
 
-### Веб-сервис с VectorDB
+### Веб-сервис с BinaryVectorDatabase
 
 ```java
-// Пример простого HTTP сервера с VectorDB
-public class VectorDBWebService {
-    private VectorDatabase vectorDB;
+// Пример простого HTTP сервера с BinaryVectorDatabase
+public class BinaryVectorDBWebService {
+    private BinaryVectorDatabase vectorDB;
     private OllamaKnowledgeClient knowledgeClient;
+    private BinaryVectorDBJsonManager jsonManager;
     
-    public VectorDBWebService() throws Exception {
+    public BinaryVectorDBWebService() throws Exception {
         KnowledgeConfig config = new KnowledgeConfig(
             "http://localhost:11434", "llama3.2", 0.7, true, true
         );
@@ -649,8 +963,12 @@ public class VectorDBWebService {
             "http://localhost:11434", "all-minilm:22m", 0.7
         );
         
-        this.vectorDB = new VectorDatabase("./data/webservice", chunker);
+        this.vectorDB = new BinaryVectorDatabase("./data/webservice", chunker, 1024 * 1024 * 1024);
         this.knowledgeClient = new OllamaKnowledgeClient(vectorDB, config);
+        this.jsonManager = new BinaryVectorDBJsonManager(vectorDB);
+        
+        // Создание индексов для веб-сервиса
+        vectorDB.createIndex("web_content_index", "content");
     }
     
     public String handleSearch(String query, int limit) {
@@ -680,11 +998,15 @@ public class VectorDBWebService {
         }
     }
     
+    public JSONObject getStats() {
+        return jsonManager.exportDatabaseStatsToJson();
+    }
+    
     public static void main(String[] args) throws Exception {
-        VectorDBWebService service = new VectorDBWebService();
+        BinaryVectorDBWebService service = new BinaryVectorDBWebService();
         
         // Пример использования
-        System.out.println("=== Пример веб-сервиса ===");
+        System.out.println("=== Пример веб-сервиса с BinaryVectorDatabase ===");
         
         String searchResults = service.handleSearch("искусственный интеллект", 3);
         System.out.println(searchResults);
@@ -692,323 +1014,207 @@ public class VectorDBWebService {
         String answer = service.handleQuestion("Что такое машинное обучение?");
         System.out.println("Ответ на вопрос: " + answer);
         
+        JSONObject stats = service.getStats();
+        System.out.println("Статистика: " + stats.toString(2));
+        
         service.vectorDB.close();
     }
 }
 ```
 
-### Интеграция с Spring Boot
-
-```java
-/*
-// Пример конфигурации Spring Boot
-@Configuration
-public class VectorDBConfig {
-    
-    @Bean
-    @Primary
-    public SemanticChunker semanticChunker() {
-        return new SemanticChunker(
-            "http://localhost:11434",
-            "all-minilm:22m",
-            0.8
-        );
-    }
-    
-    @Bean
-    @Primary
-    public VectorDatabase vectorDatabase(SemanticChunker chunker) {
-        return new VectorDatabase("./data/spring_app", chunker);
-    }
-    
-    @Bean
-    @Primary
-    public KnowledgeConfig knowledgeConfig() {
-        return new KnowledgeConfig(
-            "http://localhost:11434",
-            "llama3.2",
-            0.7,
-            true,
-            true
-        );
-    }
-    
-    @Bean
-    @Primary
-    public OllamaKnowledgeClient knowledgeClient(VectorDatabase vectorDB, 
-                                               KnowledgeConfig config) {
-        return new OllamaKnowledgeClient(vectorDB, config);
-    }
-}
-
-// Пример сервиса
-@Service
-public class KnowledgeService {
-    
-    @Autowired
-    private VectorDatabase vectorDB;
-    
-    @Autowired
-    private OllamaKnowledgeClient knowledgeClient;
-    
-    @Autowired
-    private KnowledgeLoader knowledgeLoader;
-    
-    public void addDocument(String document, String docId, String category) {
-        try {
-            vectorDB.storeTextWithChunking(
-                document, docId, new Object[]{"docs", category}
-            );
-        } catch (Exception e) {
-            throw new RuntimeException("Ошибка добавления документа", e);
-        }
-    }
-    
-    public List<SearchResult> search(String query, int limit) {
-        try {
-            List<VectorSearchResult> vectorResults = 
-                vectorDB.similaritySearch(query, limit);
-            
-            return vectorResults.stream()
-                .map(this::toSearchResult)
-                .collect(Collectors.toList());
-        } catch (Exception e) {
-            throw new RuntimeException("Ошибка поиска", e);
-        }
-    }
-    
-    public String askQuestion(String question) {
-        return knowledgeClient.generateResponseWithKnowledge(question);
-    }
-    
-    private SearchResult toSearchResult(VectorSearchResult vectorResult) {
-        return new SearchResult(
-            vectorResult.getVectorData().getText(),
-            vectorResult.getSimilarity()
-        );
-    }
-    
-    public static class SearchResult {
-        private final String text;
-        private final double similarity;
-        
-        public SearchResult(String text, double similarity) {
-            this.text = text;
-            this.similarity = similarity;
-        }
-        
-        // getters
-    }
-}
-*/
-```
-
 ## Утилиты и инструменты
 
-### Мониторинг производительности
+### Мониторинг производительности с новым функционалом
 
 ```java
-public class PerformanceMonitor {
-    private long startTime;
+public class AdvancedPerformanceMonitor {
     
-    public void startTiming() {
-        startTime = System.currentTimeMillis();
-    }
-    
-    public long stopTiming() {
-        return System.currentTimeMillis() - startTime;
-    }
-    
-    public static void monitorSearch(VectorDatabase vectorDB, String query, int iterations) {
-        PerformanceMonitor monitor = new PerformanceMonitor();
-        
-        System.out.println("=== Мониторинг производительности поиска ===");
+    public static void monitorWithMemoryTracking(BinaryVectorDatabase vectorDB, String query, int iterations) {
+        System.out.println("=== Расширенный мониторинг производительности ===");
         System.out.println("Запрос: " + query);
         System.out.println("Итераций: " + iterations);
         
         long totalTime = 0;
+        long minTime = Long.MAX_VALUE;
+        long maxTime = Long.MIN_VALUE;
         
         for (int i = 0; i < iterations; i++) {
-            monitor.startTiming();
+            long startTime = System.currentTimeMillis();
             
             try {
                 List<VectorSearchResult> results = vectorDB.similaritySearch(query, 5);
-                long duration = monitor.stopTiming();
+                long duration = System.currentTimeMillis() - startTime;
                 totalTime += duration;
+                minTime = Math.min(minTime, duration);
+                maxTime = Math.max(maxTime, duration);
                 
                 System.out.printf("Итерация %d: %d мс, найдено: %d результатов%n",
                     i + 1, duration, results.size());
+                    
+                // Проверка памяти каждые 5 итераций
+                if (i % 5 == 0) {
+                    Map<String, Object> memoryStats = vectorDB.getMemoryStats();
+                    System.out.printf("  Память: %d/%d MB%n",
+                        memoryStats.get("estimatedUsageMB"), memoryStats.get("maxMemoryMB"));
+                }
                     
             } catch (Exception e) {
                 System.out.println("Ошибка в итерации " + (i + 1) + ": " + e.getMessage());
             }
         }
         
+        System.out.printf("\nИтоговая статистика:%n");
         System.out.printf("Среднее время: %.2f мс%n", (double) totalTime / iterations);
+        System.out.printf("Минимальное время: %d мс%n", minTime);
+        System.out.printf("Максимальное время: %d мс%n", maxTime);
+        
+        // Информация об индексах
+        Map<String, Object> indexesInfo = vectorDB.getIndexesInfo();
+        System.out.println("Активные индексы: " + indexesInfo.keySet());
     }
     
     public static void main(String[] args) throws Exception {
         SemanticChunker chunker = new SemanticChunker(
             "http://localhost:11434", "all-minilm:22m", 0.8
         );
-        VectorDatabase vectorDB = new VectorDatabase("./data/performance", chunker);
+        
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase(
+            "./data/performance", chunker, 512 * 1024 * 1024
+        );
+        
+        // Создание индексов для тестирования
+        vectorDB.createIndex("perf_content_index", "content");
         
         // Загрузка тестовых данных
         for (int i = 0; i < 100; i++) {
             vectorDB.storeTextWithChunking(
-                "Тестовый документ номер " + i + " с некоторым содержанием",
+                "Тестовый документ номер " + i + " с некоторым содержанием для тестирования производительности",
                 "test_doc_" + i,
-                new Object[]{"test", "docs"}
+                new Object[]{"test", "performance"}
             );
         }
         
         // Тестирование производительности
-        monitorSearch(vectorDB, "тестовый документ", 10);
+        monitorWithMemoryTracking(vectorDB, "тестовый документ", 10);
         
         vectorDB.close();
     }
 }
 ```
 
-### Утилиты для отладки
+### Утилиты для отладки нового функционала
 
 ```java
-public class DebugUtilities {
+public class AdvancedDebugUtilities {
     
-    public static void printVectorDBInfo(VectorDatabase vectorDB) {
-        System.out.println("=== Информация о VectorDatabase ===");
+    public static void printBinaryVectorDBInfo(BinaryVectorDatabase vectorDB) {
+        System.out.println("=== Расширенная информация о BinaryVectorDatabase ===");
         System.out.println("Количество векторов: " + vectorDB.getVectorCount());
         System.out.println("Количество узлов: " + vectorDB.getTreeNodeCount());
         
+        // Статистика памяти
+        Map<String, Object> memoryStats = vectorDB.getMemoryStats();
+        System.out.println("\n=== Статистика памяти ===");
+        memoryStats.forEach((key, value) -> System.out.println(key + ": " + value));
+        
+        // Информация об индексах
+        Map<String, Object> indexesInfo = vectorDB.getIndexesInfo();
+        System.out.println("\n=== Информация об индексах ===");
+        if (indexesInfo.isEmpty()) {
+            System.out.println("Индексы не созданы");
+        } else {
+            indexesInfo.forEach((name, info) -> {
+                Map<String, Object> indexInfo = (Map<String, Object>) info;
+                System.out.printf("%s: %d записей, %d KB%n",
+                    name, indexInfo.get("size"), indexInfo.get("estimatedMemoryKB"));
+            });
+        }
+        
         // Пример информации о нескольких векторах
-        List<VectorData> sampleVectors = vectorDB.exactSearch("");
+        List<BinaryVectorData> sampleVectors = vectorDB.findAllVectorData();
         int sampleSize = Math.min(3, sampleVectors.size());
         
         System.out.println("\nПримеры векторов (" + sampleSize + " из " + sampleVectors.size() + "):");
         for (int i = 0; i < sampleSize; i++) {
-            VectorData vector = sampleVectors.get(i);
+            BinaryVectorData vector = sampleVectors.get(i);
             System.out.printf("  %d. ID: %s%n", i + 1, vector.getId());
             System.out.printf("     Текст: %s%n", 
                 vector.getText().substring(0, Math.min(50, vector.getText().length())) + "...");
+            System.out.printf("     Chunk Index: %d%n", vector.getChunkIndex());
             System.out.printf("     Путь: %s%n", vector.getNodePath());
-            System.out.printf("     Документ: %s%n", vector.getDocumentId());
         }
     }
     
-    public static void printChunkerInfo(SemanticChunker chunker) {
-        System.out.println("\n=== Информация о SemanticChunker ===");
-        System.out.println("Конфигурация: " + chunker.getConfigInfo());
-        System.out.println("Модель эмбеддингов: " + chunker.getEmbeddingModel());
-        System.out.println("URL Ollama: " + chunker.getOllamaBaseUrl());
-        System.out.println("Текущий порог: " + chunker.getSimilarityThreshold());
-    }
-    
-    public static void testEmbeddingGeneration(SemanticChunker chunker) throws Exception {
-        System.out.println("\n=== Тест генерации эмбеддингов ===");
+    public static void testBinarySerialization() throws IOException {
+        System.out.println("\n=== Тест бинарной сериализации ===");
         
-        String[] testTexts = {
-            "привет мир",
-            "искусственный интеллект",
-            "машинное обучение"
-        };
+        // Создание тестовых данных
+        BinaryVectorData vectorData = new BinaryVectorData(
+            "test_binary_1",
+            new float[]{0.1f, 0.2f, 0.3f},
+            "Тестовый текст для бинарной сериализации",
+            "{\"test\": true}",
+            "[test, binary]",
+            "test_doc",
+            0
+        );
         
-        for (String text : testTexts) {
-            float[] embedding = chunker.getEmbedding(text);
-            System.out.printf("Текст: '%s' -> Размерность эмбеддинга: %d%n",
-                text, embedding.length);
-        }
+        // Сериализация
+        byte[] serialized = vectorData.serialize();
+        System.out.println("Размер сериализованных данных: " + serialized.length + " bytes");
+        
+        // Десериализация
+        BinaryVectorData restored = BinaryVectorData.deserialize(serialized);
+        System.out.println("Данные восстановлены: " + restored.getId());
+        System.out.println("Вектор восстановлен: " + (restored.getVector() != null ? "да" : "нет"));
     }
     
     public static void main(String[] args) throws Exception {
         SemanticChunker chunker = new SemanticChunker(
             "http://localhost:11434", "all-minilm:22m", 0.8
         );
-        VectorDatabase vectorDB = new VectorDatabase("./data/debug_demo", chunker);
+        
+        BinaryVectorDatabase vectorDB = new BinaryVectorDatabase(
+            "./data/debug_demo", chunker, 256 * 1024 * 1024
+        );
+        
+        // Создание индексов для тестирования
+        vectorDB.createIndex("debug_content_index", "content");
         
         // Загрузка демо данных
         vectorDB.storeTextWithChunking(
-            "Тестовый текст для отладки и демонстрации возможностей системы",
+            "Тестовый текст для отладки и демонстрации возможностей системы с бинарной сериализацией",
             "debug_doc",
             new Object[]{"debug", "test"}
         );
         
         // Запуск утилит
-        printVectorDBInfo(vectorDB);
-        printChunkerInfo(chunker);
-        testEmbeddingGeneration(chunker);
+        printBinaryVectorDBInfo(vectorDB);
+        testBinarySerialization();
         
         vectorDB.close();
-    }
-}
-```
-
-### Миграция данных
-
-```java
-public class DataMigration {
-    
-    public static void migrateData(VectorDatabase sourceDB, VectorDatabase targetDB) {
-        System.out.println("=== Миграция данных ===");
-        
-        try {
-            // Получение всех векторов из source
-            List<VectorData> allVectors = sourceDB.exactSearch("");
-            System.out.println("Найдено векторов для миграции: " + allVectors.size());
-            
-            // Миграция векторов
-            int migratedCount = 0;
-            for (VectorData vector : allVectors) {
-                targetDB.storeVectorData(vector);
-                migratedCount++;
-            }
-            
-            System.out.println("Успешно мигрировано векторов: " + migratedCount);
-            
-            // Сохранение целевой базы
-            targetDB.saveDatabase();
-            System.out.println("Миграция завершена успешно");
-            
-        } catch (Exception e) {
-            System.err.println("Ошибка миграции: " + e.getMessage());
-        }
-    }
-    
-    public static void main(String[] args) throws Exception {
-        SemanticChunker chunker = new SemanticChunker(
-            "http://localhost:11434", "all-minilm:22m", 0.8
-        );
-        
-        // Исходная база данных
-        VectorDatabase sourceDB = new VectorDatabase("./data/source_db", chunker);
-        
-        // Целевая база данных
-        VectorDatabase targetDB = new VectorDatabase("./data/target_db", chunker);
-        
-        // Загрузка демо данных в source
-        sourceDB.storeTextWithChunking(
-            "Данные для миграции в новую базу данных",
-            "migration_doc",
-            new Object[]{"migration", "test"}
-        );
-        
-        // Выполнение миграции
-        migrateData(sourceDB, targetDB);
-        
-        sourceDB.close();
-        targetDB.close();
     }
 }
 ```
 
 ## Заключение
 
-Эти примеры демонстрируют полный спектр возможностей VectorDB - от базовых операций до продвинутых сценариев использования. Вы можете использовать эти примеры как основу для построения собственных приложений с семантическим поиском и RAG-функциональностью.
+Эти примеры демонстрируют полный спектр возможностей VectorDB, включая новый функционал с бинарной сериализацией, управлением памятью, системой индексов и JSON интеграцией.
 
-Для начала рекомендуется:
-1. Запустить примеры из раздела "Быстрый старт"
-2. Изучить базовые операции с VectorDatabase и TreeNode
-3. Поэкспериментировать с различными настройками SemanticChunker
-4. Построить простое RAG-приложение с использованием OllamaKnowledgeClient
+### Ключевые особенности нового функционала:
+
+1. **BinaryVectorDatabase** - улучшенная производительность с бинарной сериализацией
+2. **Управление памятью** - контроль использования оперативной памяти
+3. **Система индексов** - ускорение поисковых запросов
+4. **BinaryVectorDBJsonManager** - полная поддержка JSON формата
+5. **BinaryTreeNode/BinaryVectorData** - оптимизированные структуры данных
+
+### Рекомендации по использованию:
+
+1. Начните с примеров из раздела "Быстрый старт"
+2. Изучите управление памятью для оптимизации производительности
+3. Используйте индексы для ускорения часто выполняемых запросов
+4. Применяйте JSON интеграцию для экспорта/импорта данных
+5. Тестируйте производительность с различными настройками памяти
 
 Все примеры готовы к запуску и требуют только наличия запущенного Ollama сервера с соответствующими моделями.
-```
